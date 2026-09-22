@@ -76,6 +76,23 @@ Pastikan statusnya **enabled** di panel Extensions.
 
 ## Changelog
 
+### v1.2.3
+- **FIX KRITIS (bug terkunci di luar extension)**: mengaktifkan *Kunci posisi tombol* (fixed
+  position) membuat kedua tombol melayang MATI — `pointerdown` bail-out saat terkunci sehingga
+  `pointerup` tidak pernah mendaftarkan tap → dashboard & dadu tak bisa dibuka. State machine
+  pointer ditulis ulang: **tap selalu berfungsi**, hanya *drag* yang disupresi saat terkunci
+  (usaha drag saat terkunci = gestur dibatalkan + animasi "nope" kecil, bukan lemparan dadu tak sengaja).
+- **Ikon lebih kecil**: FAB 46px → **38px** (ikon 22 → 18px), gap & bayangan dirapatkan,
+  offset panel disesuaikan (74 → 66px).
+- **SVG premium menyeluruh**: semua glyph emoji/teks diganti icon set stroked 24px-grid yang
+  konsisten — logo devil (tanduk proper), dadu, globe+kode bahasa (chip pill), ikon tema
+  auto/setengah·bulan·matahari sesuai state, dots menu, chevron, kaca pembesar search, gembok
+  badge saat posisi terkunci, check pada chip menu aktif.
+- **Menu baru**: **Reset posisi tombol** (kalau FAB kegeser ke posisi stuck) + toast
+  "Posisi tombol dikunci/bisa digeser lagi" saat toggle kunci.
+- **Aksesibilitas**: keyboard activation (Enter/Space) pada tombol FAB, `aria-label` + title
+  dinamis, dan theme crossfade halus (0.25s) saat ganti tema.
+
 ### v1.2.2
 - **FIX KRITIS**: `index.js` meng-import `SETTING_KEYS`/`DEFAULTS` dari `core.js` yang tidak
   mengekspornya → dynamic import tetap gagal meski path v1.2.1 benar. Ditemukan oleh harness
@@ -114,7 +131,8 @@ Pastikan statusnya **enabled** di panel Extensions.
 
 | Gejala | Cek |
 |---|---|
-| Extension gagal load saat import | Pastikan pakai ZIP **v1.2.1**; v1.2.0 punya bug import path. Hapus folder lama, import ulang, reload. |
+| Extension gagal load saat import | Pastikan pakai ZIP **v1.2.1+**; v1.2.0 punya bug import path. Hapus folder lama, import ulang, reload. |
+| Tombol melayang tak bisa diklik setelah kunci posisi | Sudah diperbaiki di **v1.2.3** (tap tetap jalan saat terkunci). Darurat versi lama: buka menu ⋯ → matikan *Kunci posisi* lewat keyboard, atau update extension. |
 | Seksi preset kosong / toggle tak berpengaruh | Preset Little Devil aktif? ST-Prompt-Template enabled? Companion enabled? |
 | Toggle berubah tapi balik sendiri | Chat metadata belum tersimpan — kirim 1 pesan lalu cek lagi |
 | `<DICE>` tidak diproses | Tag harus ada dalam 30 pesan terakhir; format `NdM:Label` |

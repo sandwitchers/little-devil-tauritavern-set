@@ -240,6 +240,7 @@ function injectUI() {
             setValue: setVar,
             defaults: DEFAULTS,
             t,
+            notify: toast,
             prefs: ext().ui,
             setPrefs(patch) {
                 Object.assign(ext().ui, patch);

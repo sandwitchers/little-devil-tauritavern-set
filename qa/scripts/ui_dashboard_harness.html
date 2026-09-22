@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LDC UI Test Harness (repo)</title>
+<style>
+  body { margin: 0; font-family: sans-serif; background: linear-gradient(160deg,#1a1626 0%,#2a1e2e 100%); min-height: 100vh; }
+  #chatmock { padding: 18px; color: #665; }
+</style>
+</head>
+<body>
+<div id="chatmock">
+  <h3>Mock chat area</h3>
+  <p>Tahukah kamu? Aku setting preset Little Devil sambil makan martabak. Helena is watching.</p>
+</div>
+<script type="module">
+// Repo harness — serves from repo root: python3 -m http.server 8123
+// (imports resolve to /extension/LittleDevilCompanionTT/*)
+import { buildDashboard } from '/extension/LittleDevilCompanionTT/ui.js';
+import { L10N } from '/extension/LittleDevilCompanionTT/data_i18n.js';
+
+const prefs = { theme: 'auto', lang: 'id', pos: null, locked: false };
+const vars = {};
+const state = { rollCount: 0, toasts: [] };
+
+function currentLang() {
+  const p = prefs.lang || 'auto';
+  if (p !== 'auto') return p;
+  const nav = (navigator.language || 'en').toLowerCase();
+  return nav.startsWith('id') ? 'id' : 'en';
+}
+function t(key, params) {
+  const lang = currentLang();
+  let s = (L10N[lang] && L10N[lang][key]) ?? (L10N.en && L10N.en[key]) ?? key;
+  if (params) for (const [k, v] of Object.entries(params)) s = s.replaceAll('{' + k + '}', v);
+  return s;
+}
+
+const host = document.createElement('div');
+host.id = 'littleDevilCompanionHost';
+host.setAttribute('data-tt-mobile-surface', 'free-window');
+host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;contain:layout style;';
+document.body.appendChild(host);
+
+const api = {
+  getValue: k => vars[k],
+  setValue: async (k, v) => { vars[k] = v; return v; },
+  defaults: {},
+  t,
+  notify: msg => state.toasts.push(msg),
+  prefs,
+  setPrefs(patch) { Object.assign(prefs, patch); },
+  actions: {
+    rollDice: async () => { state.rollCount++; },
+    resetChat: async () => {},
+    saveGlobal: async () => {},
+    applyGlobal: async () => {},
+  },
+};
+
+const dash = buildDashboard(host, api);
+const shadow = host.shadowRoot;
+
+vars.LD_msg = 42; vars.HELENA = 'FALSE'; vars.response_language = 0;
+
+window.harness = {
+  host, shadow, api, prefs, vars, state, dash,
+  panel: () => shadow.querySelector('.ldc-panel'),
+  fab: () => shadow.querySelector('.ldc-fab'),
+  fabBtn: act => shadow.querySelector(`.ldc-fab-btn[data-act="${act}"]`),
+  lockBadge: () => shadow.querySelector('.ldc-fab-lock'),
+};
+window.dispatchEvent(new Event('app-ready'));
+</script>
+</body>
+</html>

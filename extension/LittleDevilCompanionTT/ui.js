@@ -3,6 +3,14 @@
 // dependency injection — no host-app imports, fully testable.
 // Ported from ui/floating-dashboard.html (Tavo) — Planet tab removed per user,
 // auto-save replaces the explicit Save button (fewer taps on mobile).
+//
+// v1.2.3 UX fixes:
+//  - LOCK BUG: pointer state machine no longer bails on pointerdown when the
+//    position lock is on. Taps always reach the dice / panel actions; only the
+//    *drag* is suppressed. (Previously the lock killed both FAB buttons.)
+//  - All glyphs (😈 ◐ ⋯ ▶) replaced with a consistent stroked SVG icon set.
+//  - Smaller FAB footprint (38px) with a lock badge + "nope" shake feedback.
+//  - Menu gained "Reset button position"; keyboard activation supported.
 import { CATEGORIES } from './data_schema.js';
 import { PANEL_CSS } from './styles.js';
 
@@ -10,11 +18,30 @@ const esc = s => String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+// ---- premium icon set -------------------------------------------------------
+// 24px grid, stroke 1.8, round caps — tuned to stay crisp at 12–20px.
+const I = (inner, sw = 1.8) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+
 const SVG = {
-    dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.2" cy="8.2" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.8" cy="8.2" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="8.2" cy="15.8" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.8" cy="15.8" r="1.35" fill="currentColor" stroke="none"/></svg>',
-    devil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.4 2.2 1.9 3.4 3.9 3.4 2.4 0 4.1-1.7 4.1-4.4-1.2.5-2.2.7-3.2.5C15.6 1 14 0 12 0S8.4 1 7.2 2.5c-1 .2-2 0-3.2-.5 0 2.7 1.7 4.4 4.1 4.4C10.1 6.4 11.6 5.2 12 3z" transform="translate(0 2)"/><path d="M12 8c-3.6 0-6.5 2.7-6.5 6.4 0 3.4 2.6 6.1 6.5 9.6 3.9-3.5 6.5-6.2 6.5-9.6C18.5 10.7 15.6 8 12 8z" transform="translate(0 -1)"/><path d="M9.4 13.6h.01M14.6 13.6h.01" stroke-width="2.4"/></svg>',
-    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    dice: I('<rect x="3" y="3" width="18" height="18" rx="4.5"/><circle cx="8.4" cy="8.4" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.6" cy="8.4" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="8.4" cy="15.6" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.6" cy="15.6" r="1.35" fill="currentColor" stroke="none"/>'),
+    devil: I('<path d="M6.8 9.2L3.6 2.4l7 3.8z" fill="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M17.2 9.2l3.2-6.8-7 3.8z" fill="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 21.6c-4.3 0-7.2-2.8-7.2-6.8 0-3.7 2.9-6.5 7.2-6.5s7.2 2.8 7.2 6.5c0 4-2.9 6.8-7.2 6.8z"/><path d="M9.3 12.5h.01M14.7 12.5h.01" stroke-width="2.6"/><path d="M9.7 16.3c1.4.9 3.2.9 4.6 0"/>'),
+    close: I('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>', 2),
+    dots: I('<circle cx="5.2" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="18.8" cy="12" r="1.7" fill="currentColor" stroke="none"/>'),
+    chev: I('<path d="M9.2 6l6.2 6-6.2 6"/>', 2),
+    search: I('<circle cx="11" cy="11" r="6.3"/><path d="M19.6 19.6L16 16"/>', 2),
+    globe: I('<circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8"/><path d="M12 3.6c2.6 2.3 3.9 5.1 3.9 8.4s-1.3 6.1-3.9 8.4c-2.6-2.3-3.9-5.1-3.9-8.4s1.3-6.1 3.9-8.4z"/>'),
+    lock: I('<rect x="5.8" y="10.6" width="12.4" height="9.4" rx="2.6"/><path d="M8.6 10.6V8.2a3.4 3.4 0 0 1 6.8 0v2.4"/>'),
+    check: I('<path d="M4.5 12.6l5 5L19.5 6.8"/>', 2.6),
+    reset: I('<path d="M3.8 8.2A8.6 8.6 0 1 1 3.4 13"/><path d="M3.4 4.5v4h4"/>'),
+    expand: I('<path d="M4.5 9.2V4.5h4.7M19.5 9.2V4.5h-4.7M4.5 14.8v4.7h4.7M19.5 14.8v4.7h-4.7"/>', 2),
+    collapse: I('<path d="M9.2 4.5v4.7H4.5M14.8 4.5v4.7h4.7M9.2 19.5v-4.7H4.5M14.8 19.5v-4.7h4.7"/>', 2),
+    theme_auto: I('<circle cx="12" cy="12" r="8.4"/><path d="M12 3.6a8.4 8.4 0 0 1 0 16.8z" fill="currentColor" stroke="none"/>'),
+    theme_dark: I('<path d="M20.6 13.4A8.6 8.6 0 1 1 10.6 3.4a6.8 6.8 0 0 0 10 10z"/>'),
+    theme_light: I('<circle cx="12" cy="12" r="4.1"/><path d="M12 2.6v2.1M12 19.3v2.1M4.7 4.7l1.5 1.5M17.8 17.8l1.5 1.5M2.6 12h2.1M19.3 12h2.1M4.7 19.3l1.5-1.5M17.8 6.2l1.5-1.5"/>'),
 };
+
+const themeIcon = t => t === 'dark' ? SVG.theme_dark : t === 'light' ? SVG.theme_light : SVG.theme_auto;
 
 export function buildDashboard(host, api) {
     const root = document.createElement('div');
@@ -29,29 +56,36 @@ export function buildDashboard(host, api) {
 
     root.innerHTML = `
       <div class="ldc-fab" part="fab">
-        <button class="ldc-fab-btn" data-act="dice" title=""></button>
-        <button class="ldc-fab-btn ldc-devil" data-act="panel" title=""></button>
+        <button class="ldc-fab-btn" data-act="dice" title="" aria-label=""></button>
+        <button class="ldc-fab-btn ldc-devil" data-act="panel" title="" aria-label="">
+          <span class="ldc-fab-lock" hidden>${SVG.lock}</span>
+        </button>
       </div>
       <section class="ldc-panel" hidden>
         <header class="ldc-head">
-          <span class="ldc-logo">😈</span>
+          <span class="ldc-logo">${SVG.devil}</span>
           <div class="ldc-titles">
             <h2></h2>
             <p class="ldc-sub"><span class="ldc-subtext"></span> <span class="ldc-pulse"></span></p>
           </div>
           <div class="ldc-head-btns">
-            <button class="ldc-icon-btn" data-act="lang"></button>
-            <button class="ldc-icon-btn" data-act="theme">◐</button>
-            <button class="ldc-icon-btn" data-act="menu">⋯</button>
+            <button class="ldc-icon-btn ldc-lang" data-act="lang">${SVG.globe}<span class="ldc-lang-code"></span></button>
+            <button class="ldc-icon-btn" data-act="theme"></button>
+            <button class="ldc-icon-btn" data-act="menu">${SVG.dots}</button>
             <button class="ldc-icon-btn" data-act="close">${SVG.close}</button>
           </div>
         </header>
-        <div class="ldc-search"><input type="text" enterkeyhint="search"></div>
+        <div class="ldc-search">
+          <span class="ldc-search-ic">${SVG.search}</span>
+          <input type="text" enterkeyhint="search">
+        </div>
         <div class="ldc-menu" hidden></div>
         <div class="ldc-body"></div>
       </section>`;
 
     const $ = sel => shadow.querySelector(sel);
+    $('.ldc-fab-btn').insertAdjacentHTML('afterbegin', SVG.dice);
+    $('.ldc-devil').insertAdjacentHTML('afterbegin', SVG.devil);
     const fab = $('.ldc-fab');
     const panel = $('.ldc-panel');
     const searchInput = $('.ldc-search input');
@@ -141,7 +175,7 @@ export function buildDashboard(host, api) {
                 <span class="ldc-dot" style="--c:${esc(cat.color)}"></span>
                 <span class="ldc-cat-name">${esc(T(cat.nameKey))}</span>
                 <span class="ldc-cat-badge" ${badge ? '' : 'hidden'}>${badge}</span>
-                <span class="ldc-chev">▶</span>
+                <span class="ldc-chev">${SVG.chev}</span>
               </summary>
               <div class="ldc-controls">${controls.map(controlHtml).join('')}</div>
             </details>`;
@@ -242,9 +276,24 @@ export function buildDashboard(host, api) {
     // ---- header / menu -------------------------------------------------------
     function refreshChrome() {
         root.setAttribute('data-theme', api.prefs.theme || 'auto');
-        $('[data-act="lang"]').textContent = langLabel();
-        fab.querySelector('[data-act="dice"]').title = T('tt.dashboard.roll');
-        fab.querySelector('[data-act="panel"]').title = T('tt.dashboard.open');
+        $('.ldc-lang-code').textContent = langLabel();
+        $('[data-act="theme"]').innerHTML = themeIcon(api.prefs.theme || 'auto');
+        $('[data-act="theme"]').title = T('ui.menu.theme');
+        $('[data-act="menu"]').title = T('ui.menu.title') || '⋯';
+        $('[data-act="close"]').title = T('tt.dashboard.close') || '✕';
+
+        const diceBtn = fab.querySelector('[data-act="dice"]');
+        const devilBtn = fab.querySelector('[data-act="panel"]');
+        diceBtn.title = T('tt.dashboard.roll');
+        diceBtn.setAttribute('aria-label', T('tt.dashboard.roll'));
+        devilBtn.title = T('tt.dashboard.open');
+        devilBtn.setAttribute('aria-label', T('tt.dashboard.open'));
+
+        // lock badge mirrors the position-lock state
+        const locked = !!api.prefs.locked;
+        const lockBadge = fab.querySelector('.ldc-fab-lock');
+        if (lockBadge) lockBadge.hidden = !locked;
+
         searchInput.placeholder = T('runtime.dashboard.searchPlaceholder');
         panel.querySelector('h2').textContent = T('runtime.dashboard.title');
         renderMenu();
@@ -256,10 +305,12 @@ export function buildDashboard(host, api) {
     }
 
     function renderMenu() {
+        const locked = !!api.prefs.locked;
         menuEl.innerHTML = `
-          <button class="ldc-chip" data-m="expand">${T('runtime.dashboard.expandAll')}</button>
-          <button class="ldc-chip" data-m="collapse">${T('runtime.dashboard.collapseAll')}</button>
-          <button class="ldc-chip" data-m="lock">${T('ui.menu.lockPosition')}${api.prefs.locked ? ' ✓' : ''}</button>
+          <button class="ldc-chip" data-m="expand">${SVG.expand}${T('runtime.dashboard.expandAll')}</button>
+          <button class="ldc-chip" data-m="collapse">${SVG.collapse}${T('runtime.dashboard.collapseAll')}</button>
+          <button class="ldc-chip ${locked ? 'is-on' : ''}" data-m="lock">${locked ? SVG.check : SVG.lock}${T('ui.menu.lockPosition')}</button>
+          <button class="ldc-chip" data-m="posreset">${SVG.reset}${T('ui.menu.resetPosition')}</button>
           <button class="ldc-chip" data-m="saveg">${T('tt.menu.saveGlobal')}</button>
           <button class="ldc-chip" data-m="applyg">${T('tt.menu.applyGlobal')}</button>
           <button class="ldc-chip danger" data-m="reset">${T('runtime.dashboard.resetAll')}</button>`;
@@ -271,7 +322,18 @@ export function buildDashboard(host, api) {
         const m = b.getAttribute('data-m');
         if (m === 'expand') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = true); openCats = new Set(CATEGORIES.map(c => c.key)); }
         else if (m === 'collapse') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = false); openCats.clear(); }
-        else if (m === 'lock') { api.setPrefs({ locked: !api.prefs.locked }); renderMenu(); }
+        else if (m === 'lock') {
+            const next = !api.prefs.locked;
+            api.setPrefs({ locked: next });
+            refreshChrome();
+            api.notify?.(T(next ? 'runtime.toast.lockOn' : 'runtime.toast.lockOff'));
+        }
+        else if (m === 'posreset') {
+            api.setPrefs({ pos: null });
+            fab.style.right = '';
+            fab.style.bottom = '';
+            api.notify?.(T('runtime.toast.positionReset'));
+        }
         else if (m === 'saveg') { await api.actions.saveGlobal(); savedPulse(); }
         else if (m === 'applyg') {
             if (window.confirm(T('tt.confirm.applyGlobal'))) { await api.actions.applyGlobal(); firstOpen = true; openCats.clear(); renderBody(); savedPulse(); }
@@ -329,9 +391,15 @@ export function buildDashboard(host, api) {
     // delivering events after the pointer leaves the fab. Tap-vs-drag is decided
     // by an 8px threshold; the pressed button is tracked in state (e.target is
     // retargeted to the capture element once captured).
+    //
+    // v1.2.3 FIX: the position lock must NOT swallow taps. The state machine now
+    // always tracks the gesture; the lock only suppresses repositioning (and, if
+    // the user actually dragged, the release is treated as a cancelled gesture —
+    // with a small "nope" shake — instead of an accidental dice roll).
     let dragState = null;
+
     fab.addEventListener('pointerdown', e => {
-        if (api.prefs.locked) return;
+        if (e.button !== undefined && e.button !== 0) return;
         const btn = e.target.closest('.ldc-fab-btn');
         dragState = {
             btn,
@@ -342,12 +410,14 @@ export function buildDashboard(host, api) {
         };
         try { fab.setPointerCapture(e.pointerId); } catch { /* noop */ }
     });
+
     fab.addEventListener('pointermove', e => {
-        if (!dragState) return;
+        if (!dragState || e.pointerId !== dragState.pointerId) return;
         const dx = e.clientX - dragState.startX;
         const dy = e.clientY - dragState.startY;
         if (!dragState.moved && Math.hypot(dx, dy) < 8) return;
         dragState.moved = true;
+        if (api.prefs.locked) return; // locked → keep tracking, never reposition
         const rect = fab.getBoundingClientRect();
         let right = window.innerWidth - e.clientX - (rect.width / 2);
         let bottom = window.innerHeight - e.clientY - (rect.height / 2);
@@ -356,22 +426,43 @@ export function buildDashboard(host, api) {
         fab.style.right = right + 'px';
         fab.style.bottom = bottom + 'px';
     });
+
     fab.addEventListener('pointerup', e => {
-        if (!dragState) return;
+        if (!dragState || e.pointerId !== dragState.pointerId) return;
         const st = dragState;
         dragState = null;
         if (st.moved) {
+            if (api.prefs.locked) { nopeShake(); return; } // dragged while locked → cancelled
             const rect = fab.getBoundingClientRect();
             api.setPrefs({ pos: { r: Math.round(window.innerWidth - rect.right), b: Math.round(window.innerHeight - rect.bottom) } });
             return;
         }
-        if (st.btn) {
-            const act = st.btn.getAttribute('data-act');
-            if (act === 'dice') api.actions.rollDice();
-            else if (act === 'panel') togglePanel();
-        }
+        fireAction(st.btn);
     });
-    fab.addEventListener('pointercancel', () => { dragState = null; });
+    fab.addEventListener('pointercancel', e => {
+        if (dragState && e.pointerId === dragState.pointerId) dragState = null;
+    });
+
+    // Keyboard activation (Enter/Space on a focused FAB button fires a click
+    // with detail === 0; pointer-generated clicks are handled by pointerup).
+    fab.addEventListener('click', e => {
+        if (e.detail !== 0) return;
+        fireAction(e.target.closest('.ldc-fab-btn'));
+    });
+
+    function fireAction(btn) {
+        if (!btn) return;
+        const act = btn.getAttribute('data-act');
+        if (act === 'dice') api.actions.rollDice();
+        else if (act === 'panel') togglePanel();
+    }
+
+    function nopeShake() {
+        fab.classList.remove('ldc-nope');
+        void fab.offsetWidth; // restart animation
+        fab.classList.add('ldc-nope');
+    }
+    fab.addEventListener('animationend', () => fab.classList.remove('ldc-nope'));
 
     // restore fab position
     if (api.prefs.pos && typeof api.prefs.pos.r === 'number') {

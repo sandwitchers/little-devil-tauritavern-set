@@ -1,4 +1,4 @@
-# QA Report — Little Devil × TauriTavern Set (v1.2.2)
+# QA Report — Little Devil × TauriTavern Set (v1.2.3)
 
 Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 6 (simulator STPT), source TauriTavern 2.3.0 sebagai ground truth.
 
@@ -14,10 +14,34 @@ Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 
 | 6 | `qa_render` | **Simulasi STPT**: 12.888 render EJS nyata × 7 skenario state + uji efektivitas kontrol | ✅ 0 critical, 31/31 select efektif |
 | 7 | `qa_ui_e2e` | **Integrasi penuh**: `index.js` asli + mock ST di browser — event flow, dadu, profil global, migrasi tipe | ✅ 12/12 |
 | 8 | `test_ui` | Dashboard unit E2E (desktop + mobile 540×1237@1.33) | ✅ 17/17 |
+| 9 | `test_ui_dashboard` *(v1.2.3)* | **Pointer state machine FAB**: lock/tap/drag matrix, lock badge, toast, reset posisi, keyboard activation, verifikasi tema via fresh-raster clip | ✅ 25/25 |
 
 **Status akhir: LOLOS SEMUA SUITE — 0 critical, 0 warn terbuka.**
 
 ## Bug yang ditemukan & diperbaiki selama QA
+
+### 🔴 CRIT-2: Kunci posisi membunuh kedua tombol FAB (dilaporkan user, v1.2.2)
+Gejala: begitu *Kunci posisi tombol* diaktifkan, dashboard & dadu **tidak bisa dibuka lagi**.
+- **Akar masalah**: `pointerdown` handler FAB melakukan `if (api.prefs.locked) return;` sehingga
+  `dragState` tidak pernah terisi saat terkunci; `pointerup` (`if (!dragState) return;`) lalu
+  membuang seluruh gesture — termasuk tap.
+- **Perbaikan (v1.2.3)**: state machine selalu melacak gesture; lock hanya menyupresi
+  reposisi. Drag saat terkunci = gestur dibatalkan + animasi "nope" (bukan aksi tak sengaja).
+- **Regresi**: suite #9 `test_ui_dashboard` mengunci matriks lock/tap/drag (25 assertions).
+
+### 🟡 COSM-1: Glyph emoji/teks pada chrome UI (v1.2.2)
+`😈 ◐ ⋯ ▶` diganti icon set SVG stroked 24px-grid yang konsisten (devil, dice, globe+lang chip,
+theme auto/moon/sun dinamis, dots, chevron, search, lock badge, check). FAB diperkecil
+46 → 38px. Verifikasi visual via screenshot Playwright (device-scale 4× + native).
+
+### ⚠️ CATATAN QA: artefak screenshot headless (bukan bug extension)
+Saat verifikasi tema di Playwright, screenshot full-viewport sesekali menampilkan tile
+compositor basi (panel "gelap") meski state DOM/computed style sudah terang — **terbukti
+artefak rasterisasi headless** via perbandingan clip fresh-raster (region sama, 0 ms
+setelahnya, menampilkan warna benar). Verifikasi tema memakai clipped screenshot +
+assertion computed-style (`test_ui_dashboard` #20–21). Browser nyata (WebView2/Android)
+repaint normal pada pergantian atribut; tema juga kini diberi crossfade 0.25s yang
+memaksa invalidasi paint di semua compositor.
 
 ### 🔴 CRIT-1: `index.js` meng-import nama yang tidak diekspor `core.js` (v1.2.1)
 `index.js` meng-import `SETTING_KEYS, DEFAULTS` dari `./core.js`, padahal `core.js` hanya
@@ -99,4 +123,7 @@ node qa/scripts/qa_regex_sample.mjs    # smoke substitusi regex
 node qa/scripts/qa_render.mjs          # render EJS 12.888× (butuh ejs)
 node qa/scripts/qa_ui_e2e.mjs          # integrasi browser (butuh playwright)
 node qa/scripts/test_ui.mjs            # dashboard E2E (butuh playwright + scripts/ui_harness)
+# v1.2.3 — FAB pointer state machine (butuh playwright):
+cd repo-root && python3 -m http.server 8123 &
+node qa/scripts/test_ui_dashboard.mjs  # harness: qa/scripts/ui_dashboard_harness.html
 ```
