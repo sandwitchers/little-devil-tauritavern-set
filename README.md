@@ -51,7 +51,12 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 ### 3. Regex Scripts
 1. Panel **Extensions** → **Regex** → **Import Script**.
 2. Pilih `regex/Little_Devil_Regex_Scripts_TT_Import.json` (53 script masuk sekaligus) — scope **Global**.
-   Termasuk 3 script dadu baru v1.3.0: *Request Chip*, *Result Card*, *Free Roll*.
+   Termasuk 3 script dadu: *Request Chip*, *Result Card*, *Free Roll*.
+
+> **Sejak v1.3.2 langkah ini opsional** — extension otomatis meng-install & memperbarui 3 script
+> dadu itu sendiri saat boot (tidak ada lagi bubble kosong karena pack regex belum di-import;
+> fallback renderer internal menjamin marker dadu selalu tampil sebagai kartu). Import manual
+> tetap berguna kalau kamu ingin menyesuaikan tampilan kartu lewat UI Regex.
 
 ### 4. Cek ST-Prompt-Template
 Pastikan statusnya **enabled** di panel Extensions.
@@ -77,8 +82,10 @@ Pastikan statusnya **enabled** di panel Extensions.
     dikirim ke chat sebagai **kartu dadu premium** (label, formula, angka besar, badge verdict
     SUCCESS/HARD SUCCESS/CRITICAL/FUMBLE berwarna, pill CoC/D&D + ADV/DIS) — lalu AI melanjutkan
     narasi berdasarkan hasilnya.
-  - Kartu hasil dirender oleh regex script (*Dice Result Card / Free Roll*), teks mentah yang
-    dilihat AI tetap ringkas dan terstruktur.
+  - Kartu hasil dirender oleh regex script (*Dice Result Card / Free Roll*) — **sejak v1.3.2**
+    script-script itu di-install otomatis oleh extension (dan ada fallback renderer internal),
+    jadi hasil roll **tidak akan pernah tampil sebagai bubble kosong** walau pack regex belum
+    di-import / regex dimatikan. Teks mentah yang dilihat AI tetap ringkas dan terstruktur.
   - Anti dobel berbasis konten: pesan yang sama tidak dilempar ulang; **swipe** ke varian dengan
     tag berbeda otomatis melempar ulang.
   - Matikan lewat **Menu ⋯ → Auto-lempar dadu ke chat** (lempar manual via tombol 🎲 di FAB
@@ -97,6 +104,27 @@ Pastikan statusnya **enabled** di panel Extensions.
   `<DICE>` langsung di-roll otomatis (bisa dimatikan) dan hasilnya masuk chat sebagai kartu.
 
 ## Changelog
+
+### v1.3.2 — "bubble-nya kosong!"
+- **Laporan user**: hasil roll tampil **kosong** di bubble user (inspect menampilkan marker
+  `<DiceCard …/>` mentah), dan chip `<DICE>` di pesan GM juga tampil sebagai teks polos.
+- **Akar masalah**: rendering kartu diserahkan ke 3 script regex yang baru ditambahkan belakangan
+  (#51–53). Install yang belum meng-import pack regex terbaru membiarkan DOMPurify men-strip tag
+  `<DiceCard/>` yang tidak dikenal (self-closing tanpa isi) → **bubble kosong**.
+- **Fix A — self-install regex**: extension kini meng-upsert 3 script dadu ke
+  `extension_settings.regex` saat boot (id & nama identik dengan pack import → tidak pernah
+  duplikat; definisi lama otomatis diperbarui; flag disabled pilihan user dihormati). Rendering
+  berjalan native di pipeline regex host tanpa langkah manual apa pun.
+- **Fix B — fallback DOM**: MutationObserver pada `#chat` memindai bubble yang masih memuat
+  marker mentah dan mengecatnya lewat `renderDiceContent()` (core.js) setiap kali jalur regex
+  tidak jalan (mis. regex extension dimatikan). Marker tidak akan pernah lagi collapse jadi
+  bubble kosong dalam konfigurasi apa pun.
+- **Single source of truth**: HTML kartu/chip sekarang dibangun oleh builder di core.js;
+  replaceString regex dihasilkan dari builder yang sama (token `$1`–`$8`), jadi pack import dan
+  self-install tidak mungkin beda tampilan.
+- QA: **+54 test** (`qa/scripts/test_dice_render_132.mjs`) — mereplikasi marker persis dari
+  screenshot user (`&amp;`, `·`), kontrak engine regex TT, upsert idempotent, fallback DOM,
+  marker rusak tidak boleh meledak. Semua suite lama tetap hijau.
 
 ### v1.3.1 — "kok TRPG mode-nya mati?"
 - **Diagnosis**: laporan user — toggle TRPG mode di-dashboard tidak mengubah perilaku model,
@@ -202,7 +230,7 @@ Pastikan statusnya **enabled** di panel Extensions.
 |---|---|
 | **Mode TRPG tidak aktif padahal toggle sudah ON** | 1) Menu ⋯ → **Status integrasi**: ST-Prompt-Template harus **aktif** (kalau tidak terdeteksi → install: Extensions → Install extension → `https://github.com/zonde306/ST-Prompt-Template`, lalu enable). 2) Variabel harus `105/105` ter-seed. 3) **Uji sinkronisasi** harus OK. 4) Kirim pesan baru / regenerate (prompt di-render ulang tiap generate). |
 | Toggle berubah tapi preset tidak merasa | Lihat badge amber di FAB — kalau nyala, bridge STPT down (lihat baris di atas). Kalau tidak: Menu ⋯ → **Simpan sekarang**, lalu regenerate. |
-| Extension gagal load saat import | Pakai ZIP **v1.3.1**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
+| Extension gagal load saat import | Pakai ZIP **v1.3.2**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
 | Tombol melayang tak bisa diklik setelah kunci posisi | Sudah diperbaiki di **v1.2.3** (tap tetap jalan saat terkunci). Darurat versi lama: buka menu ⋯ → matikan *Kunci posisi* lewat keyboard, atau update extension. |
 | Seksi preset kosong / toggle tak berpengaruh | Preset Little Devil aktif? ST-Prompt-Template enabled? Companion enabled? |
 | Toggle berubah tapi balik sendiri | Chat metadata belum tersimpan — kirim 1 pesan lalu cek lagi |

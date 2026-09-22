@@ -35,6 +35,21 @@
 //  - Settings commits scrub our keys from STPT per-message variable snapshots
 //    (chat[i].variables) so no stale clone can shadow fresh values on any
 //    STPT version.
+//
+// v1.3.2 dice display hardening (fixes EMPTY chat bubbles after a roll):
+//  - Root cause of the empty bubble: roll results are stored as raw
+//    <DiceCard>/<DiceFree> markers and rendering was delegated to the
+//    companion regex pack — but installs that never imported the newer pack
+//    (the dice trio was added after the original 51 scripts) let DOMPurify
+//    strip the unknown self-closing tags, leaving a blank user bubble.
+//  - Fix A: the extension now self-installs/refreshes the three dice regex
+//    scripts into extension_settings.regex at boot (same ids/names as the
+//    import pack → upsert, never duplicates). The host's regex engine then
+//    renders markers natively at display time on every install.
+//  - Fix B (safety net): a debounced DOM fallback scans rendered bubbles for
+//    raw markers and repaints them via core.js renderDiceContent() whenever
+//    the regex path could not run (e.g. regex extension disabled). Markers can
+//    no longer collapse to empty bubbles in any configuration.
 // ============================================================================
 
 // NOTE on relative depth: third-party extensions live at
@@ -55,6 +70,7 @@ import {
     scanHelenaMessages, helenaInText,
     extractDiceTags, parseDiceRequest, resolveCheck,
     buildDiceResultMessage, scrubMessageVariables,
+    DICE_REGEX_SCRIPTS, hasDiceMarkers, renderDiceContent,
 } from './core.js';
 import { buildDashboard } from './ui.js';
 import { L10N } from './data_i18n.js';
@@ -188,6 +204,7 @@ async function performRoll(foundIndex, tags, announce) {
     }
     await setVarsBulk({ LD_last_roll: rollKey });
     await sendMessageAsUser(buildDiceResultMessage(entries));
+    scheduleDiceScan(); // v1.3.2 — paint the result bubble even if events lag
     if (announce) toast(t('runtime.dice.rolled', { count: String(tags.length) }));
     return true;
 }
@@ -219,6 +236,99 @@ async function rollFromMessage(messageId) {
 
 async function rollDiceAction() {
     await rollFromMessage(null);
+}
+
+// ---- v1.3.2 dice display: self-installed regex scripts ----------------------
+// Roll results and request chips are painted by the host's regex engine. The
+// companion import pack ships these scripts, but installs that never imported
+// the newer pack render nothing (DOMPurify strips the unknown self-closing
+// tags → empty bubble). Upserting our definitions into
+// extension_settings.regex at boot makes rendering automatic everywhere; ids
+// and scriptNames match the import pack so this can never create duplicates.
+function ensureDiceRegexScripts() {
+    try {
+        if (!Array.isArray(extension_settings.regex)) extension_settings.regex = [];
+        const list = extension_settings.regex;
+        let changed = 0;
+        for (const script of DICE_REGEX_SCRIPTS) {
+            const i = list.findIndex(s => s && typeof s === 'object' &&
+                (s.id === script.id || s.scriptName === script.scriptName));
+            if (i < 0) {
+                list.push({ ...script });
+                changed++;
+            } else if (list[i].findRegex !== script.findRegex ||
+                       list[i].replaceString !== script.replaceString ||
+                       list[i].scriptName !== script.scriptName) {
+                // Outdated definition → refresh it, keep the user's disabled
+                // flag: if they deliberately switched the script off, that
+                // choice wins (the DOM fallback still paints the bubble).
+                list[i] = { ...script, disabled: list[i].disabled === true };
+                changed++;
+            }
+        }
+        if (changed) {
+            saveSettingsDebounced();
+            console.log(`${LOG} dice display scripts installed/refreshed: ${changed}`);
+        }
+    } catch (e) {
+        console.warn(`${LOG} ensureDiceRegexScripts failed:`, e);
+    }
+}
+
+// ---- v1.3.2 dice display: DOM fallback safety net ----------------------------
+// If the regex path could not run for a bubble (regex extension disabled,
+// unexpected host behavior, scripts switched off), repaint the bubble here.
+// Detection is signature-based: the regex replacement HTML carries
+// data-ld-dice-request/card/free attributes — if none are present while the
+// raw message still holds markers, the fallback takes over. A fingerprint
+// attribute keeps the rescan (and our own mutation) from looping.
+let diceChatObserver = null;
+let diceObservedChatEl = null;
+let diceScanTimer = null;
+
+function scanDiceBubbles() {
+    try {
+        const ctx = getContext();
+        const chat = ctx && Array.isArray(ctx.chat) ? ctx.chat : null;
+        if (!chat) return;
+        const blocks = document.querySelectorAll('#chat .mes');
+        for (const block of blocks) {
+            const idx = parseInt(block.getAttribute('mesid') ?? '', 10);
+            if (!Number.isFinite(idx) || !chat[idx]) continue;
+            const msg = chat[idx];
+            const raw = String((msg && (msg.extra && msg.extra.display_text)) || (msg && msg.mes) || '');
+            if (!hasDiceMarkers(raw)) continue;
+            const textEl = block.querySelector('.mes_text');
+            if (!textEl || block.classList.contains('editing')) continue;
+            if (textEl.querySelector('[data-ld-dice-request],[data-ld-dice-card],[data-ld-dice-free]')) continue;
+            const fingerprint = 'L' + raw.length + ':' + idx;
+            if (textEl.getAttribute('data-ld-dice-fallback') === fingerprint) continue;
+            textEl.innerHTML = renderDiceContent(raw);
+            textEl.setAttribute('data-ld-dice-fallback', fingerprint);
+        }
+    } catch (e) {
+        console.warn(`${LOG} dice bubble scan failed:`, e);
+    }
+}
+
+function scheduleDiceScan() {
+    ensureDiceObserver();
+    clearTimeout(diceScanTimer);
+    diceScanTimer = setTimeout(scanDiceBubbles, 250);
+}
+
+function ensureDiceObserver() {
+    try {
+        const chatEl = document.getElementById('chat');
+        if (!chatEl) return;
+        if (diceChatObserver && diceObservedChatEl === chatEl) return;
+        if (diceChatObserver) { try { diceChatObserver.disconnect(); } catch { /* stale */ } }
+        diceChatObserver = new MutationObserver(scheduleDiceScan);
+        diceChatObserver.observe(chatEl, { childList: true, subtree: true, characterData: true });
+        diceObservedChatEl = chatEl;
+    } catch (e) {
+        console.warn(`${LOG} dice observer failed:`, e);
+    }
 }
 
 // v1.3.0 immersion: when the AI (or a swipe variant / first message) asks for
@@ -425,6 +535,11 @@ function injectUI() {
             }
         }, true);
 
+        // v1.3.2: dice display — watch chat mutations and repaint any marker
+        // bubble the regex path missed.
+        ensureDiceObserver();
+        scheduleDiceScan();
+
         console.log(`${LOG} dashboard injected`);
     } catch (e) {
         console.error(`${LOG} injectUI failed:`, e);
@@ -433,17 +548,20 @@ function injectUI() {
 
 // ---- boot --------------------------------------------------------------------
 function register() {
+    ensureDiceRegexScripts(); // v1.3.2 — install before the first paint
     eventSource.on(event_types.APP_READY, () => {
         injectUI();
+        ensureDiceRegexScripts();
         // TT activates deferred third-party extensions after APP_READY; the chat
         // may already be open — seed it here, CHAT_CHANGED covers later switches.
         initChat();
     });
-    eventSource.on(event_types.CHAT_CHANGED, () => { initChat(); });
-    eventSource.on(event_types.MESSAGE_SENT, (idx) => { onMessageAdded(idx); });
-    eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => { onMessageAdded(idx); maybeAutoRoll(idx); });
-    eventSource.on(event_types.MESSAGE_SWIPED, () => { recomputeDerived(); });
-    eventSource.on(event_types.MESSAGE_DELETED, () => { recomputeDerived(); });
+    eventSource.on(event_types.CHAT_CHANGED, () => { initChat(); scheduleDiceScan(); });
+    eventSource.on(event_types.MESSAGE_SENT, (idx) => { onMessageAdded(idx); scheduleDiceScan(); });
+    eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => { onMessageAdded(idx); maybeAutoRoll(idx); scheduleDiceScan(); });
+    eventSource.on(event_types.MESSAGE_SWIPED, () => { recomputeDerived(); scheduleDiceScan(); });
+    eventSource.on(event_types.MESSAGE_DELETED, () => { recomputeDerived(); scheduleDiceScan(); });
+    if (event_types.MESSAGE_UPDATED) eventSource.on(event_types.MESSAGE_UPDATED, () => { scheduleDiceScan(); });
 }
 
 register();
@@ -454,8 +572,10 @@ register();
 // idempotent, so running them here is harmless when APP_READY also lands.
 try {
     const bootCtx = getContext();
+    ensureDiceRegexScripts();
     if (bootCtx && bootCtx.chatId && Array.isArray(bootCtx.chat)) {
         injectUI();
         initChat();
+        scheduleDiceScan();
     }
 } catch { /* APP_READY will cover it */ }

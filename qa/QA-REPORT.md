@@ -1,4 +1,4 @@
-# QA Report — Little Devil × TauriTavern Set (v1.3.1)
+# QA Report — Little Devil × TauriTavern Set (v1.3.2)
 
 Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 6 (simulator STPT), source TauriTavern 2.3.0 sebagai ground truth.
 
@@ -198,3 +198,51 @@ karena tidak ada tombol save.
 | `test_ui` | ✅ 17/17 |
 | `test_ui_dashboard` | ✅ ALL (ekspektasi SVG FAB 3→4: + warn badge) |
 | `qa_ui_e2e` | ✅ 24/24 (+6: status ok/down, sync test, save-now, pulse commit, scrub snapshot) |
+
+## Tambahan v1.3.2 — dice display hardening (bubble kosong)
+
+**Laporan user**: hasil roll tampil **kosong** di bubble user; inspect memperlihatkan marker
+`<DiceCard label="Arcana" sys="D&amp;D" … total="23" …/>` mentah. Chip `<DICE>` di pesan GM
+juga tampil sebagai teks polos, bukan chip.
+
+### Akar masalah (terverifikasi terhadap source TT 2.3.0)
+- Rendering kartu diserahkan ke 3 script regex (`#51–53`, ditambah belakangan). Install yang
+  belum meng-import pack regex terbaru tidak punya script itu sama sekali.
+- `script.js messageFormatting()` → regex tidak menemukan script → tag `<DiceCard/>` lolos ke
+  showdown + DOMPurify → **tag custom self-closing tanpa isi di-strip** → bubble kosong.
+  (Pada `<DICE>…</DICE>` isi teksnya selamat → tampil sebagai teks polos. Kedua gejala cocok.)
+- Konfirmasi pipeline: pesan user → placement `USER_INPUT (1)` + `isMarkdown:true` — script
+  `markdownOnly` memang dijalankan engine (`engine.js isRegexScriptActiveForParams`) — jadi
+  begitu script ADA, rendering pasti jalan.
+
+### Perbaikan v1.3.2
+1. **Fix A — self-install**: `ensureDiceRegexScripts()` (index.js) meng-upsert 3 script dadu ke
+   `extension_settings.regex` saat boot. Id/scriptName identik dengan pack import → tidak pernah
+   duplikat; definisi lama diperbarui otomatis; flag `disabled` pilihan user dipertahankan.
+2. **Fix B — fallback DOM**: `scanDiceBubbles()` + MutationObserver (debounce 250 ms) pada
+   `#chat`; bubble yang raw-nya masih memuat marker tapi TIDAK memuat signature
+   `data-ld-dice-request/card/free` dicat ulang via `renderDiceContent()`; fingerprint
+   `data-ld-dice-fallback` mencegah loop render.
+3. **Single source of truth**: builder `diceChipHtml / diceCardHtml / diceFreeHtml` (core.js)
+   menghasilkan HTML untuk replaceString regex (via token `$1`–`$8`) DAN fallback DOM — pack
+   import, self-install, dan fallback dijamin identik.
+4. `update_dice_regex_json.mjs` meregenerasi 3 entri di `regex/Little_Devil_Regex_Scripts_TT_Import.json`
+   langsung dari `core.js` (chip ternyata sudah identik byte-per-byte; card/free +signature).
+
+### Hasil regresi penuh (v1.3.2)
+| Suite | Hasil |
+|---|---|
+| `verify_imports` | ✅ ALL IMPORTS VERIFIED |
+| `test_dice_render_132` (baru) | ✅ **54/54** — marker persis dari screenshot user (`&amp;`, `·`), 8 capture group, replacement bertanda tanda, fallback DOM non-kosong, escaping aman, marker rusak tidak meledak, kontrak engine TT lengkap, upsert idempotent (refresh +3 → run ke-2 = 0) |
+| `test_core` | ✅ 29/29 |
+| `test_dice_card` | ✅ 25/25 |
+| `test_ui` | ✅ 17/17 |
+| `test_ui_dashboard` | ✅ ALL |
+| `qa_core_diff` | ✅ 40 pass, 0 critical |
+| `qa_regex_sample` | ✅ 0 critical |
+| `qa_render` | ✅ 0 critical |
+| `qa_static` | ✅ 0 critical (+regex compile OK) |
+| `qa_ui_e2e` | ✅ 24/24 |
+
+Catatan environment: `npm install ejs playwright` + `npx playwright install chromium` +
+static server port 8123 diperlukan untuk suite UI (harness `scripts/ui_test_harness.html`).
