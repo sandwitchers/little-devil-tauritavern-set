@@ -1,0 +1,869 @@
+[
+ {
+  "id": "little_devil_regex_00_0456c5e9",
+  "scriptName": "Format Stats Opening",
+  "findRegex": "/(<stats>)([^\\n])/g",
+  "replaceString": "$1\n$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_01_10bf1436",
+  "scriptName": "Format Stats Closing",
+  "findRegex": "/([^\\n])<stats>/g",
+  "replaceString": "$1\n<stats>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_02_1382ed61",
+  "scriptName": "Render Status Panel",
+  "findRegex": "/^<stats>\\s*(?<username>[^\\n]+)\\s*\\n[Oo]utfit:\\s*(?<outfit>[^\\n]+)\\s*\\n[Cc]ondition:\\s*(?<condition>[^\\n]+)\\s*(?:\\n[Ii]nventory:\\s*(?<inventory>[^\\n]+))?\\s*\\n[Ll]ocation:\\s*(?<location>[^\\n]+)\\s*\\n(?:\\.{3,})?(?<quote>[\\s\\S]+?)(?=\\n\\[)\\s*\\n\\[(?<time>[^\\]]+)\\]\\s*(?:\\n(?<name_and_icon1>[^\\n]+?)\\s*(?<favor1>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus1>.+?)\\s*\\[(?<location1>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon2>[^\\n]+?)\\s*(?<favor2>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus2>.+?)\\s*\\[(?<location2>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon3>[^\\n]+?)\\s*(?<favor3>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus3>.+?)\\s*\\[(?<location3>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon4>[^\\n]+?)\\s*(?<favor4>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus4>.+?)\\s*\\[(?<location4>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon5>[^\\n]+?)\\s*(?<favor5>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus5>.+?)\\s*\\[(?<location5>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon6>[^\\n]+?)\\s*(?<favor6>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus6>.+?)\\s*\\[(?<location6>[^\\]]+)\\])?\\s*<\\/stats>/gmsi",
+  "replaceString": "<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody {\n  margin: 0;\n  padding: 5px;\n  background: linear-gradient(135deg, \n    var(--bg-gradient-1) 0%, \n    var(--bg-gradient-2) 35%, \n    var(--bg-gradient-3) 100%);\n  min-height: 100vh;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.status-wrapper {\n  color: var(--text-primary);\n  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;\n  padding: 16px;\n  max-width: 500px;\n  width: 100%;\n  margin: 5px auto;\n  \n  background: var(--bg-secondary);\n  border: 1px solid var(--border-subtle);\n  border-radius: 16px;\n  box-shadow: \n    0 8px 32px var(--shadow-soft),\n    0 2px 8px rgba(0, 0, 0, 0.05),\n    inset 0 1px 0 var(--highlight-color);\n  \n  background-image: \n    radial-gradient(circle at 20% 20%, var(--accent-glow) 0%, transparent 50%),\n    radial-gradient(circle at 80% 80%, rgba(244, 123, 123, 0.03) 0%, transparent 50%);\n  \n  font-size: 13px;\n  line-height: 1.4;\n  position: relative;\n  \n  backdrop-filter: blur(10px);\n  -webkit-backdrop-filter: blur(10px);\n}\n\n.status-wrapper::before {\n  content: '';\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  height: 1px;\n  background: linear-gradient(90deg, \n    transparent 0%, \n    var(--highlight-color) 50%, \n    transparent 100%);\n  border-radius: 16px 16px 0 0;\n}\n\n.username {\n  color: var(--text-title);\n  font-size: 20px;\n  font-weight: 700;\n  margin: 0 0 10px 0;\n  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);\n}\n\n.info-line {\n  margin: 4px 0;\n  font-size: 12px;\n  color: var(--text-secondary);\n  padding: 4px 8px;\n  background: var(--bg-tertiary);\n  border-radius: 8px;\n  border: 1px solid var(--highlight-color);\n}\n\n.info-line strong {\n  font-weight: 600;\n  color: var(--text-primary);\n  margin-right: 8px;\n}\n\n.info-line[data-content=\"\"] {\n  display: none;\n}\n\n.user-quote {\n  font-style: italic;\n  color: var(--text-secondary);\n  text-align: center;\n  padding: 8px 12px;\n  margin: 8px 0;\n  font-size: 13px;\n  background: var(--bg-primary);\n  border-radius: 12px;\n  border-left: 3px solid var(--favor-neutral);\n  position: relative;\n  \n  background-image: linear-gradient(135deg, \n    rgba(244, 123, 123, 0.02) 0%, \n    transparent 50%);\n}\n\n.user-quote::before,\n.user-quote::after {\n  content: '\"';\n  font-size: 18px;\n  color: var(--text-tertiary);\n  opacity: 0.6;\n}\n\n.timestamp {\n  font-size: 11px;\n  color: var(--text-tertiary);\n  text-align: right;\n  margin-bottom: 10px;\n  white-space: nowrap;\n  padding: 4px 8px;\n  background: var(--timestamp-bg);\n  border-radius: 6px;\n  display: inline-block;\n  margin-left: auto;\n  width: fit-content;\n}\n\n.char-list {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  margin-top: 5px;\n}\n\n.char-item {\n  display: grid;\n  grid-template-columns: 1fr auto;\n  grid-template-rows: auto auto auto;\n  align-items: center;\n  gap: 0px 10px;\n  padding: 8px;\n  background: var(--bg-tertiary);\n  border-radius: 10px;\n  border: 1px solid var(--border-subtle);\n  transition: all 0.2s ease;\n  position: relative;\n  overflow: hidden;\n}\n\n.char-item::before {\n  content: '';\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  height: 2px;\n  background: linear-gradient(90deg, \n    var(--favor-neutral) 0%, \n    transparent 100%);\n  opacity: 0.6;\n  transition: background 0.3s ease;\n}\n\n.char-item:hover {\n  background: var(--bg-hover);\n  border-color: var(--border-hover);\n  transform: translateY(-1px);\n}\n\n.char-item[data-content=\"\"] {\n  display: none;\n}\n\n.char-name-icon {\n  grid-column: 1 / 2;\n  font-weight: bold;\n  font-size: 14px;\n  white-space: nowrap;\n  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);\n}\n\n.char-favor {\n  grid-column: 2 / 3;\n  justify-self: end;\n  font-weight: bold;\n  font-size: 13px;\n  white-space: nowrap;\n  padding: 4px 8px;\n  border-radius: 6px;\n  background: var(--timestamp-bg);\n  transition: all 0.3s ease;\n}\n\n.char-status {\n  grid-column: 1 / 3;\n  color: var(--text-secondary);\n  font-size: 12px;\n  padding-top: 2px;\n  padding-left: 4px;\n  border-top: 1px solid var(--highlight-color);\n  margin-top: 2px;\n}\n\n.char-location {\n  grid-column: 1 / 3;\n  color: var(--text-tertiary);\n  font-size: 11px;\n  padding-left: 4px;\n  margin-top: 2px;\n}\n\n.char-location::before {\n  content: '📍 ';\n  opacity: 0.7;\n}\n\n.favor-symbol {\n  margin-right: 2px;\n  font-size: 14px;\n}\n</style>\n</script>\n</head>\n<body>\n<div class=\"status-wrapper\">\n  <div class=\"username\">$<username></div>\n  <p class=\"info-line\"><strong>복장:</strong> $<outfit></p>\n  <p class=\"info-line\"><strong>상태:</strong> $<condition></p>\n  <p class=\"info-line\" data-content=\"$<inventory>\"><strong>소지품:</strong> $<inventory></p>\n  <p class=\"info-line\"><strong>위치:</strong> $<location></p>\n  \n  <p class=\"user-quote\">$<quote></p>\n  <div class=\"timestamp\"><span>$<time></span></div>\n\n  <div class=\"char-list\">\n    <div class=\"char-item\" data-content=\"$<name_and_icon1>\">\n      <div class=\"char-name-icon\">$<name_and_icon1></div>\n      <div class=\"char-favor\">$<favor1></div>\n      <div class=\"char-status\">$<fullstatus1></div>\n      <div class=\"char-location\">$<location1></div>\n    </div>\n    <div class=\"char-item\" data-content=\"$<name_and_icon2>\">\n      <div class=\"char-name-icon\">$<name_and_icon2></div>\n      <div class=\"char-favor\">$<favor2></div>\n      <div class=\"char-status\">$<fullstatus2></div>\n      <div class=\"char-location\">$<location2></div>\n    </div>\n    <div class=\"char-item\" data-content=\"$<name_and_icon3>\">\n      <div class=\"char-name-icon\">$<name_and_icon3></div>\n      <div class=\"char-favor\">$<favor3></div>\n      <div class=\"char-status\">$<fullstatus3></div>\n      <div class=\"char-location\">$<location3></div>\n    </div>\n    <div class=\"char-item\" data-content=\"$<name_and_icon4>\">\n      <div class=\"char-name-icon\">$<name_and_icon4></div>\n      <div class=\"char-favor\">$<favor4></div>\n      <div class=\"char-status\">$<fullstatus4></div>\n      <div class=\"char-location\">$<location4></div>\n    </div>\n    <div class=\"char-item\" data-content=\"$<name_and_icon5>\">\n      <div class=\"char-name-icon\">$<name_and_icon5></div>\n      <div class=\"char-favor\">$<favor5></div>\n      <div class=\"char-status\">$<fullstatus5></div>\n      <div class=\"char-location\">$<location5></div>\n    </div>\n    <div class=\"char-item\" data-content=\"$<name_and_icon6>\">\n      <div class=\"char-name-icon\">$<name_and_icon6></div>\n      <div class=\"char-favor\">$<favor6></div>\n      <div class=\"char-status\">$<fullstatus6></div>\n      <div class=\"char-location\">$<location6></div>\n    </div>\n  </div>\n</div>\n</body>\n</html>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": 5
+ },
+ {
+  "id": "little_devil_regex_03_68eebe9a",
+  "scriptName": "Status Compaction — Recent",
+  "findRegex": "/<stats>[\\s\\S]+?Location: (.+)[\\s\\S]+?\\[(.+?)\\][\\s\\S]+?<\\/stats>/msgi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": 8
+ },
+ {
+  "id": "little_devil_regex_04_f2ec79ce",
+  "scriptName": "Status Compaction — Archived",
+  "findRegex": "/<stats>[\\s\\S]+?Location: (.+)[\\s\\S]+?\\[(.+?)\\][\\s\\S]+?<\\/stats>/msgi",
+  "replaceString": "[$1]\n[$2]",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": 9,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_05_65283e8b",
+  "scriptName": "Preserve Status Data",
+  "findRegex": "/^<stats>\\s*(?<username>[^\\n]+)\\s*\\n[Oo]utfit:\\s*(?<outfit>[^\\n]+)\\s*\\n[Cc]ondition:\\s*(?<condition>[^\\n]+)\\s*(?:\\n[Ii]nventory:\\s*(?<inventory>[^\\n]+))?\\s*\\n[Ll]ocation:\\s*(?<location>[^\\n]+)\\s*\\n(?:\\.{3,})?(?<quote>[\\s\\S]+?)(?=\\n\\[)\\s*\\n\\[(?<time>[^\\]]+)\\]\\s*(?:\\n(?<name_and_icon1>[^\\n]+?)\\s*(?<favor1>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus1>.+?)\\s*\\[(?<location1>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon2>[^\\n]+?)\\s*(?<favor2>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus2>.+?)\\s*\\[(?<location2>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon3>[^\\n]+?)\\s*(?<favor3>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus3>.+?)\\s*\\[(?<location3>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon4>[^\\n]+?)\\s*(?<favor4>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus4>.+?)\\s*\\[(?<location4>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon5>[^\\n]+?)\\s*(?<favor5>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus5>.+?)\\s*\\[(?<location5>[^\\]]+)\\])?(?:\\s*\\n(?<name_and_icon6>[^\\n]+?)\\s*(?<favor6>\\S+\\s*-?\\d{1,3}%)\\s+(?:[Ss]tatus\\s+)?(?<fullstatus6>.+?)\\s*\\[(?<location6>[^\\]]+)\\])?\\s*<\\/stats>/gmsi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_06_957b37e4",
+  "scriptName": "NPC Status Panel",
+  "findRegex": "/\\[NPC_LIST\\|([^:]+):\\s{0,1}([^;]+);\\s{0,1}Secret:\\s{0,1}([^/]+)/KnownBy:([^|\\]]+)/g",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": 5
+ },
+ {
+  "id": "little_devil_regex_07_3adc78c8",
+  "scriptName": "Hide NPC Secrets",
+  "findRegex": "/\\[NPC_LIST\\|([^:]+):\\s{0,1}([^;]+);\\s{0,1}Secret:\\s{0,1}([^/]+)/KnownBy:([^|\\]]+)/g",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_08_7f567137",
+  "scriptName": "Remove NPC Secrets",
+  "findRegex": "/\\[NPC_LIST\\|([^:]+):\\s{0,1}([^;]+);\\s{0,1}Secret:\\s{0,1}([^/]+)/KnownBy:([^|\\]]+)/g",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_09_175617ff",
+  "scriptName": "Display Tips",
+  "findRegex": "/<tip>(.*?)</tip>/msi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_10_8e2c4c07",
+  "scriptName": "Hide Tips",
+  "findRegex": "/<tip>(.*?)</tip>/msi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": 3
+ },
+ {
+  "id": "little_devil_regex_11_fd2dc919",
+  "scriptName": "Delete Tips",
+  "findRegex": "/<tip>(.*?)</tip>/msi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_12_c2c25ca9",
+  "scriptName": "Hide Telescope Annotations",
+  "findRegex": "/┣[^┫]*┫/gsi",
+  "replaceString": "$&",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_13_8099379a",
+  "scriptName": "Remove Chatindex Heading",
+  "findRegex": "/^####\\s+Chatindex:.*\\r?\\n?/gm",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_14_22fbf680",
+  "scriptName": "Hidden Spoiler",
+  "findRegex": "/\\@(?:Hidden|히든|숨겨진)[^\\@]*\\@[^:]*:\\s*([^\\n]*)\\s*[^:]*:\\s*([^\\@]*(?:@(?!END|끝@)[^\\@]*)*)@(?:END|끝)\\@/g",
+  "replaceString": "<details class=\"hidden-Spoiler\">\n<summary>$1</summary>\n<div>\n\n$2\n</div>\n</details>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_15_d5cdaa0a",
+  "scriptName": "Remove Lore and NPC Settings",
+  "findRegex": "/<Lore>(.*)</Lore>/gs",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_16_e287ccfc",
+  "scriptName": "Normalize Hyeong Sound",
+  "findRegex": "/(§[^§]*?)혀엉([^§]*?§)/g",
+  "replaceString": "$1흐응$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_17_cb00d931",
+  "scriptName": "Normalize Liquid Sound",
+  "findRegex": "/(§[^§]*?)찌개액([^§]*?§)/g",
+  "replaceString": "$1달각달각$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_18_9b890b44",
+  "scriptName": "Normalize Extended Liquid Sound",
+  "findRegex": "/(§[^§]*?)찌개애액([^§]*?§)/g",
+  "replaceString": "$1달각달각$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_19_556a64fa",
+  "scriptName": "Normalize Semen Term",
+  "findRegex": "/씨물/g",
+  "replaceString": "정액",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_20_eb1230f1",
+  "scriptName": "Normalize Zipper Sound",
+  "findRegex": "/(§[^§]*?)지퍼어억([^§]*?§)/g",
+  "replaceString": "$1지이익$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_21_09f5489e",
+  "scriptName": "Normalize Tearing Sound",
+  "findRegex": "/(§[^§]*?)찢어어억([^§]*?§)/g",
+  "replaceString": "$1찌이익$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_22_79f8c341",
+  "scriptName": "Normalize Metal Impact Sound",
+  "findRegex": "/(§[^§]*?)파킨([^§]*?§)/g",
+  "replaceString": "$1쨍그랑$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_23_bbddc915",
+  "scriptName": "Normalize Ripping Sound",
+  "findRegex": "/(§[^§]*?)뜯어억([^§]*?§)/g",
+  "replaceString": "$1찌이익$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_24_0bc71613",
+  "scriptName": "Normalize Choking Sound",
+  "findRegex": "/(§[^§]*?)옭([^§]*?§)/g",
+  "replaceString": "$1끼익$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_25_c71d4aec",
+  "scriptName": "Normalize Bird Chirp Sound",
+  "findRegex": "/(§[^§]*?)지저귁([^§]*?§)/g",
+  "replaceString": "$1짹$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_26_157dfdc3",
+  "scriptName": "Normalize Wiping Sound",
+  "findRegex": "/(§[^§]*?)닦음([^§]*?§)/g",
+  "replaceString": "$1뽀득$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_27_89a8f50e",
+  "scriptName": "Render Tagged Thoughts",
+  "findRegex": "/<Thoughts>([\\s\\S]*?)<\\/Thoughts>\\s*/gis",
+  "replaceString": "<details class=\"lumiverse-thoughts\"><summary>Thoughts</summary>\n$1\n</details>\n\n",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_28_bedabea8",
+  "scriptName": "Hide Response Heading",
+  "findRegex": "/^# Response\\s*\\r?\\n+/gmi",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_29_7305dab0",
+  "scriptName": "Timeline — Display Chip",
+  "findRegex": "/^(?<prefix>\\s*(?:⏱️|🕓|🔮|⏱|🕐|🕑|🕒|🕔|🕕|🕖|🕗|🕘|🕙|🕚|🕛)?\\s*)\\[(?<date>\\d{4}-\\d{2}-\\d{2})\\s+\\((?<dow>[A-Za-z]{3}|[\\uAC00-\\uD7AF]{1,3}|[\\u4E00-\\u9FFF]{1,3}|Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\\)\\s+(?<time>\\d{1,2}:\\d{2})\\s*(?<ampm>AM|PM|am|pm)?\\s*(?<tz>\\S+)?\\]\\s*$/gmu",
+  "replaceString": "<time class=\"timeline-chip\" data-timeline=\"1\" style=\"display:inline-flex;align-items:center;gap:.45em;margin:.35em 0 .6em;padding:.32em .68em;border-radius:var(--lumiverse-radius-sm, 999px);background:var(--lumiverse-primary-010, #e8eefb);border:1px solid var(--lumiverse-primary, #5b7bd5);color:var(--lumiverse-primary-text, #2a3a6b);font-size:.88em;font-weight:650;letter-spacing:.02em;line-height:1;white-space:nowrap;vertical-align:baseline;\" title=\"$<date> ($<dow>) $<time> $<ampm>\"><span aria-hidden=\"true\" style=\"font-size:1.05em;line-height:1;\">⏱️</span><span style=\"color:var(--lumiverse-primary-text, #2a3a6b);\">$<date></span><span style=\"color:var(--lumiverse-text-muted, #5a6a8a);font-weight:600;\">($<dow>)</span><span style=\"color:var(--lumiverse-primary-text, #2a3a6b);\">$<time> $<ampm></span></time>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_30_a04746ac",
+  "scriptName": "Render Ruby Annotations",
+  "findRegex": "/:([^:\\[\\]\\r\\n]+)\\[([^\\]\\r\\n]+)\\]:/g",
+  "replaceString": "<ruby style=\"ruby-position:over;color:var(--lumiverse-text);\">$1<rp>(</rp><rt style=\"color:var(--lumiverse-text-muted);font-size:.7em;\">$2</rt><rp>)</rp></ruby>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_31_ae980967",
+  "scriptName": "Style GM and OOC Commentary",
+  "findRegex": "/【\\s*(GM|OOC)\\s*:\\s*([\\s\\S]*?)\\s*】/gi",
+  "replaceString": "<aside style=\"margin:.8em 0;padding:.7em .9em;border-left:3px solid var(--lumiverse-primary);border-radius:var(--lumiverse-radius-sm);background:var(--lumiverse-primary-010);color:var(--lumiverse-prose-italic);\"><strong style=\"color:var(--lumiverse-primary-text);letter-spacing:.05em;\">$1</strong><span style=\"color:var(--lumiverse-prose-italic);\"> — $2</span></aside>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_32_b4c383d5",
+  "scriptName": "Style Full OOC Responses",
+  "findRegex": "/^# OOC\\s*\\r?\\n+([\\s\\S]+)$/gmi",
+  "replaceString": "<section style=\"margin:.8em 0;padding:.8em 1em;border-left:3px solid var(--lumiverse-primary);border-radius:var(--lumiverse-radius-sm);background:var(--lumiverse-primary-010);color:var(--lumiverse-prose-italic);\"><strong style=\"display:block;margin-bottom:.45em;color:var(--lumiverse-primary-text);letter-spacing:.06em;\">OOC</strong>$1</section>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_33_bf759420",
+  "scriptName": "Style Onomatopoeia",
+  "findRegex": "/§\\s*([^§\\r\\n]+?)\\s*§/g",
+  "replaceString": "<span style=\"color:var(--lumiverse-prose-italic);font-style:italic;font-weight:650;letter-spacing:.06em;\">$1</span>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_34_f2742977",
+  "scriptName": "Style RP Guide",
+  "findRegex": "/<RP-Guide>\\s*([\\s\\S]*?)\\s*<\\/RP-Guide>/gi",
+  "replaceString": "<section style=\"margin:.8em 0;padding:.8em 1em;border-left:3px solid var(--lumiverse-primary);border-radius:var(--lumiverse-radius-sm);background:var(--lumiverse-primary-010);color:var(--lumiverse-text);\"><strong style=\"display:block;margin-bottom:.45em;color:var(--lumiverse-primary-text);letter-spacing:.05em;\">RP Guide</strong>$1</section>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_35_bce0c3e7",
+  "scriptName": "Style Choices",
+  "findRegex": "/<AOS>\\s*([\\s\\S]*?)\\s*<\\/AOS>/gi",
+  "replaceString": "<section style=\"margin:.8em 0;padding:.8em 1em;border:1px solid var(--lumiverse-border);border-radius:var(--lumiverse-radius-md);background:var(--lumiverse-fill-subtle);color:var(--lumiverse-text);\"><strong style=\"display:block;margin-bottom:.45em;color:var(--lumiverse-prose-dialogue);letter-spacing:.05em;\">Choices</strong>$1</section>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_36_24d58092",
+  "scriptName": "Style Helena Tip",
+  "findRegex": "/<tip>\\s*([\\s\\S]*?)\\s*<\\/tip>/gi",
+  "replaceString": "<aside style=\"margin:.8em 0;padding:.7em .9em;border-left:3px solid var(--lumiverse-warning);border-radius:var(--lumiverse-radius-sm);background:var(--lumiverse-fill-subtle);color:var(--lumiverse-prose-italic);\"><strong style=\"color:var(--lumiverse-warning);\">Tip</strong><span style=\"color:var(--lumiverse-prose-italic);\"> — $1</span></aside>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_37_e44433e5",
+  "scriptName": "Style Knowledge Reference",
+  "findRegex": "/<Knowledge>\\s*([\\s\\S]*?)\\s*<\\/Knowledge>/gi",
+  "replaceString": "<section style=\"margin:.8em 0;padding:.8em 1em;border-left:3px solid var(--lumiverse-prose-dialogue);border-radius:var(--lumiverse-radius-sm);background:var(--lumiverse-fill-subtle);color:var(--lumiverse-text);\"><strong style=\"display:block;margin-bottom:.45em;color:var(--lumiverse-prose-dialogue);letter-spacing:.05em;\">Knowledge</strong>$1</section>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_30_0a324c1e4d",
+  "scriptName": "Remove Encryption Marker",
+  "findRegex": "/(§[^§]*?)암호화([^§]*?§)/g",
+  "replaceString": "$1일반텍스트$2",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_31_c3d12b43ba",
+  "scriptName": "Replace Special Characters",
+  "findRegex": "/[特殊]/g",
+  "replaceString": "[SPECIAL]",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_32_8e7b5c6a9f",
+  "scriptName": "Normalize Line Breaks",
+  "findRegex": "/\\n{2,}/g",
+  "replaceString": "\n",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_33_3f4e1c5b2a",
+  "scriptName": "Style Speech Bubbles",
+  "findRegex": "/💬(.*?)💬/g",
+  "replaceString": "<blockquote>$1</blockquote>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_34_9c2e7d1f4a",
+  "scriptName": "Remove Emphasis",
+  "findRegex": "/\\*\\*(.*?)\\*\\*/g",
+  "replaceString": "$1",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_35_5a8f3e6c1b",
+  "scriptName": "Remove Color Tags",
+  "findRegex": "/<color[^>]*>(.*?)<\\/color>/gi",
+  "replaceString": "$1",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_36_7b4c2d9e3a",
+  "scriptName": "Trim Text",
+  "findRegex": "/^\\s+|\\s+$/gm",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_37_4e6f1a2b8c",
+  "scriptName": "Extract Numbers",
+  "findRegex": "/[^0-9]/g",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_38_6d3a8e5f9b",
+  "scriptName": "Normalize Markdown Headers",
+  "findRegex": "/^#+\\s+/gm",
+  "replaceString": "## ",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_39_8c7d5f2e4a",
+  "scriptName": "Wrap Code Blocks",
+  "findRegex": "/```([^`]*)```/gs",
+  "replaceString": "<code>$1</code>",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": false,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_40_3f5e7a1c6b",
+  "scriptName": "Escape Curly Braces",
+  "findRegex": "/\\{\\{(.*?)\\}\\}/g",
+  "replaceString": "[[$1]]",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_41_9e2d4a8b5c",
+  "scriptName": "Normalize Spaces",
+  "findRegex": "/  +/g",
+  "replaceString": " ",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": false,
+  "promptOnly": true,
+  "runOnEdit": false,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little-devil-dice-display",
+  "scriptName": "DICE — Show Pending Roll (Display Only)",
+  "findRegex": "/<(?:DICE|dice)>([\\s\\S]*?)<\\/(?:DICE|dice)>/g",
+  "replaceString": "**🎲 Roll requested:** `$1` — tap the 🎲 button on the last message to roll.",
+  "trimStrings": [],
+  "placement": [
+   2
+  ],
+  "disabled": true,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ }
+]

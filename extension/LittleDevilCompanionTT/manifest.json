@@ -1,0 +1,11 @@
+{
+    "display_name": "Little Devil Companion (TT)",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "author": "Little Devil — Tavo port → TauriTavern port",
+    "version": "1.2.1",
+    "homePage": "",
+    "auto_update": false
+}
