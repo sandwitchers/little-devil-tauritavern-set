@@ -10,6 +10,8 @@ import {
     DERIVED_ROLLS, DERIVED_PICKS, DERIVED_FLAGS, DERIVED_NONEMPTY, DERIVED_EXPRS,
 } from './data_schema.js';
 
+export { SETTING_KEYS, DEFAULTS };
+
 export const HELENA_RE = /(?:Helena|헬레나|ヘレナ|helena|へれな)/i;
 export const DICE_TAG_RE = /<(?:DICE|dice)>([\s\S]*?)<\/(?:DICE|dice)>/gi;
 
