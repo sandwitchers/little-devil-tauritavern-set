@@ -14,6 +14,16 @@
 //    (same contract as SillyTavern 1.18.0), so chat.length is the true count.
 //  - The dashboard host carries data-tt-mobile-surface="free-window" and the
 //    CSS consumes :root --tt-inset-* (safe areas) inside the Shadow DOM.
+//
+// v1.3.0 dice immersion:
+//  - MESSAGE_RECEIVED auto-rolls pending <DICE> requests and posts the result
+//    to the chat as a user message of <DiceCard>/<DiceFree> markers (toggle:
+//    dashboard menu → "Auto-roll dice into chat").
+//  - Regex-rendered request chips ([data-ld-dice-request]) are tappable and
+//    roll the tags of their own message — faithful to the Tavo client's
+//    "rendered roll button".
+//  - Anti-double-roll key is content-based (index + tag text), so swipes of
+//    the same message re-roll correctly while repeats stay blocked.
 // ============================================================================
 
 // NOTE on relative depth: third-party extensions live at
@@ -32,7 +42,8 @@ import {
     GLOBAL_DEFAULTS_KEY, MODULE_NAME,
     coerceTyped, isNumStr, buildInitWrites, computeDerivedWrites,
     scanHelenaMessages, helenaInText,
-    extractDiceTags, parseDiceRequest, resolveCheck, formatDiceResult,
+    extractDiceTags, parseDiceRequest, resolveCheck,
+    buildDiceResultMessage,
 } from './core.js';
 import { buildDashboard } from './ui.js';
 import { L10N } from './data_i18n.js';
@@ -46,10 +57,10 @@ function ext() {
     if (!extension_settings[MODULE_NAME]) {
         extension_settings[MODULE_NAME] = {
             globalDefaults: null, // typed snapshot of the 105 setting keys
-            ui: { theme: 'auto', lang: 'auto', pos: null, locked: false },
+            ui: { theme: 'auto', lang: 'auto', pos: null, locked: false, autoRoll: true },
         };
     }
-    if (!extension_settings[MODULE_NAME].ui) extension_settings[MODULE_NAME].ui = { theme: 'auto', lang: 'auto', pos: null, locked: false };
+    if (!extension_settings[MODULE_NAME].ui) extension_settings[MODULE_NAME].ui = { theme: 'auto', lang: 'auto', pos: null, locked: false, autoRoll: true };
     return extension_settings[MODULE_NAME];
 }
 
@@ -139,35 +150,76 @@ async function onMessageAdded(messageId) {
     dash && dash.refresh();
 }
 
-// ---- dice (port of the Tavo 'roll-dice' last-message action) ----------------
-async function rollDiceAction() {
+// ---- dice (port of the Tavo 'roll-dice' action + v1.3.0 chat immersion) -----
+// The result is appended to the chat as ONE user message: one <DiceCard>/
+// <DiceFree> marker per roll (rendered as premium cards by the companion
+// regex scripts), plain ⚠️ lines for malformed tags. The AI reads the raw
+// markers in the prompt and narrates the outcome.
+async function performRoll(foundIndex, tags, announce) {
+    const rollKey = foundIndex + ':' + tags.join('|');
+    if (String(getVar('LD_last_roll') ?? '') === rollKey) {
+        if (announce) toast(t('runtime.dice.already'));
+        return false;
+    }
+    const entries = [];
+    for (const raw of tags) {
+        try {
+            entries.push({ ok: true, card: resolveCheck(parseDiceRequest(raw)) });
+        } catch (e) {
+            entries.push({ ok: false, text: raw.slice(0, 80) + ' — ' + (e && e.message ? e.message : 'invalid') });
+        }
+    }
+    await setVarsBulk({ LD_last_roll: rollKey });
+    await sendMessageAsUser(buildDiceResultMessage(entries));
+    if (announce) toast(t('runtime.dice.rolled', { count: String(tags.length) }));
+    return true;
+}
+
+// Shared roller: scan the given message (or, when null, the last 30) for
+// <DICE> tags and roll them. Used by the FAB button and the rendered chips.
+async function rollFromMessage(messageId) {
     try {
         const ctx = getContext();
         if (!ctx || !Array.isArray(ctx.chat) || !ctx.chat.length) return;
         let found = null;
-        for (let i = ctx.chat.length - 1; i >= Math.max(0, ctx.chat.length - DICE_LOOKBACK); i--) {
-            const tags = extractDiceTags(String(ctx.chat[i]?.mes ?? ''));
-            if (tags.length) { found = { index: i, tags }; break; }
+        if (Number.isFinite(messageId) && ctx.chat[messageId]) {
+            const tags = extractDiceTags(String(ctx.chat[messageId].mes ?? ''));
+            if (tags.length) found = { index: messageId, tags };
         }
-        if (!found) { toast(t('runtime.dice.none')); return; }
-
-        const rollKey = found.index + ':' + found.tags.length;
-        if (String(getVar('LD_last_roll') ?? '') === rollKey) { toast(t('runtime.dice.already')); return; }
-
-        const lines = [];
-        for (const raw of found.tags) {
-            try {
-                lines.push(formatDiceResult(resolveCheck(parseDiceRequest(raw))));
-            } catch (e) {
-                lines.push('⚠️ ' + raw.slice(0, 80) + ' — ' + (e && e.message ? e.message : 'invalid'));
+        if (!found) {
+            for (let i = ctx.chat.length - 1; i >= Math.max(0, ctx.chat.length - DICE_LOOKBACK); i--) {
+                const tags = extractDiceTags(String(ctx.chat[i]?.mes ?? ''));
+                if (tags.length) { found = { index: i, tags }; break; }
             }
         }
-        await setVarsBulk({ LD_last_roll: rollKey });
-        await sendMessageAsUser(lines.join('\n'));
-        toast(t('runtime.dice.rolled', { count: String(found.tags.length) }));
+        if (!found) { toast(t('runtime.dice.none')); return; }
+        await performRoll(found.index, found.tags, true);
     } catch (e) {
         console.error(`${LOG} rollDice failed:`, e);
         toast(t('runtime.dice.failed'));
+    }
+}
+
+async function rollDiceAction() {
+    await rollFromMessage(null);
+}
+
+// v1.3.0 immersion: when the AI (or a swipe variant / first message) asks for
+// a roll, roll it automatically and post the result card to the chat. The
+// dashboard menu toggle ("Auto-roll dice into chat") disables this.
+async function maybeAutoRoll(messageId) {
+    try {
+        if (ext().ui.autoRoll === false) return;
+        const ctx = getContext();
+        if (!ctx || !Array.isArray(ctx.chat)) return;
+        const i = Number.isFinite(messageId) ? messageId : ctx.chat.length - 1;
+        const msg = ctx.chat[i];
+        if (!msg) return;
+        const tags = extractDiceTags(String(msg.mes ?? ''));
+        if (!tags.length) return;
+        await performRoll(i, tags, false);
+    } catch (e) {
+        console.warn(`${LOG} auto-roll failed:`, e);
     }
 }
 
@@ -240,6 +292,7 @@ function injectUI() {
             setValue: setVar,
             defaults: DEFAULTS,
             t,
+            notify: toast,
             prefs: ext().ui,
             setPrefs(patch) {
                 Object.assign(ext().ui, patch);
@@ -256,6 +309,23 @@ function injectUI() {
         // Tavo-dashboard compatibility bridge
         window.__lildevilRecompute = () => recomputeDerived();
         window.__lildevilCompanionReady = true;
+
+        // v1.3.0: tap-to-roll on the regex-rendered dice request chips.
+        // The chip lives inside a .mes block; its mesid tells us which chat
+        // message's tags to roll (fallback: last-30 scan). Capture phase so
+        // the tap always reaches us first.
+        document.addEventListener('click', (e) => {
+            try {
+                const chip = e.target && e.target.closest ? e.target.closest('[data-ld-dice-request]') : null;
+                if (!chip) return;
+                const mesEl = chip.closest ? chip.closest('.mes') : null;
+                const idx = mesEl ? parseInt(mesEl.getAttribute('mesid'), 10) : NaN;
+                rollFromMessage(Number.isFinite(idx) ? idx : null);
+            } catch (err) {
+                console.warn(`${LOG} chip roll failed:`, err);
+            }
+        }, true);
+
         console.log(`${LOG} dashboard injected`);
     } catch (e) {
         console.error(`${LOG} injectUI failed:`, e);
@@ -272,7 +342,7 @@ function register() {
     });
     eventSource.on(event_types.CHAT_CHANGED, () => { initChat(); });
     eventSource.on(event_types.MESSAGE_SENT, (idx) => { onMessageAdded(idx); });
-    eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => { onMessageAdded(idx); });
+    eventSource.on(event_types.MESSAGE_RECEIVED, (idx) => { onMessageAdded(idx); maybeAutoRoll(idx); });
     eventSource.on(event_types.MESSAGE_SWIPED, () => { recomputeDerived(); });
     eventSource.on(event_types.MESSAGE_DELETED, () => { recomputeDerived(); });
 }

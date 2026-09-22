@@ -2,6 +2,9 @@
 // Premium-minimalist CSS injected into the Shadow Root (style isolation from
 // host app CSS + TauriTavern geometry firewall). Consumes TT :root vars
 // (--tt-inset-*) with env() fallbacks so safe areas work on Android/iOS.
+//
+// v1.2.3: tighter FAB footprint (38px), SVG icon styling, lock badge,
+// "nope" shake for drag-while-locked, language chip, search icon.
 export const PANEL_CSS = /* css */`
 :host {
   all: initial;
@@ -60,46 +63,70 @@ export const PANEL_CSS = /* css */`
   position: fixed;
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 7px;
   right: calc(max(env(safe-area-inset-right, 0px), var(--tt-inset-right, 0px)) + 12px);
   bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tt-inset-bottom, 0px)) + 16px);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
+.ldc-fab.ldc-nope { animation: ldc-nope .28s ease; }
+@keyframes ldc-nope {
+  25% { transform: translateX(-4px); }
+  55% { transform: translateX(4px); }
+  80% { transform: translateX(-2px); }
+}
 .ldc-fab-btn {
-  width: 46px;
-  height: 46px;
-  min-height: 46px;
+  position: relative;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
   color: var(--fg);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: transform .15s ease, box-shadow .15s ease;
+  transition: transform .15s ease, box-shadow .15s ease, background-color .25s ease, border-color .25s ease, color .25s ease;
 }
 .ldc-fab-btn:active { transform: scale(.92); }
-.ldc-fab-btn svg { width: 22px; height: 22px; display: block; }
+.ldc-fab-btn > svg { width: 18px; height: 18px; display: block; }
 .ldc-fab-btn.ldc-devil {
   background: linear-gradient(135deg, var(--ldc-accent), var(--ldc-accent-2));
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 6px 22px rgba(244, 63, 94, 0.45);
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.42);
 }
+.ldc-fab-lock {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--ldc-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.ldc-fab-lock svg { width: 8px; height: 8px; display: block; }
+.ldc-fab-lock[hidden] { display: none; }
 
 /* ---------- panel ---------- */
 .ldc-panel {
   pointer-events: auto;
   position: fixed;
   right: calc(max(env(safe-area-inset-right, 0px), var(--tt-inset-right, 0px)) + 10px);
-  bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tt-inset-bottom, 0px)) + 74px);
+  bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tt-inset-bottom, 0px)) + 66px);
   width: min(430px, calc(100vw - 20px));
   max-height: min(74vh, 680px);
   max-height: min(74dvh, 680px);
@@ -113,6 +140,7 @@ export const PANEL_CSS = /* css */`
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4);
   color: var(--fg);
   overflow: hidden;
+  transition: background-color .25s ease, border-color .25s ease, color .25s ease;
 }
 .ldc-panel[hidden] { display: none; }
 
@@ -124,13 +152,14 @@ export const PANEL_CSS = /* css */`
   border-bottom: 1px solid var(--line);
 }
 .ldc-logo {
-  width: 34px; height: 34px; min-width: 34px;
-  border-radius: 11px;
+  width: 30px; height: 30px; min-width: 30px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--ldc-accent), var(--ldc-accent-2));
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 17px;
+  color: #fff;
   box-shadow: 0 4px 14px rgba(244, 63, 94, 0.4);
 }
+.ldc-logo svg { width: 17px; height: 17px; display: block; }
 .ldc-titles { flex: 1; min-width: 0; }
 .ldc-titles h2 {
   margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .2px;
@@ -153,10 +182,30 @@ export const PANEL_CSS = /* css */`
   font-size: 13px; font-weight: 700;
   transition: background .15s ease, color .15s ease;
 }
+.ldc-icon-btn svg { width: 16px; height: 16px; display: block; }
 .ldc-icon-btn:hover, .ldc-icon-btn:active { background: var(--bg-hover); color: var(--fg); }
+.ldc-icon-btn.ldc-lang {
+  width: auto;
+  gap: 4px;
+  padding: 0 8px 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: .5px;
+}
+.ldc-icon-btn.ldc-lang svg { width: 12px; height: 12px; }
+.ldc-icon-btn.ldc-lang .ldc-lang-code { line-height: 1; }
 
 /* ---------- search ---------- */
-.ldc-search { padding: 10px 12px 6px; }
+.ldc-search { position: relative; padding: 10px 12px 6px; }
+.ldc-search-ic {
+  position: absolute;
+  left: 23px; top: 50%;
+  transform: translateY(calc(-50% + 2px));
+  color: var(--fg-faint);
+  pointer-events: none;
+  display: flex;
+}
+.ldc-search-ic svg { width: 14px; height: 14px; display: block; }
 .ldc-search input {
   width: 100%;
   height: 36px;
@@ -164,13 +213,14 @@ export const PANEL_CSS = /* css */`
   border: 1px solid var(--line);
   background: var(--bg-soft);
   color: var(--fg);
-  padding: 0 12px;
+  padding: 0 12px 0 33px;
   font-size: 13.5px;
   font-family: inherit;
   outline: none;
 }
 .ldc-search input:focus { border-color: color-mix(in srgb, var(--ldc-accent) 55%, transparent); }
 .ldc-search input::placeholder { color: var(--fg-faint); }
+.ldc-search input, .ldc-input, .ldc-select { transition: border-color .2s ease, background-color .2s ease, color .2s ease; }
 
 /* ---------- menu ---------- */
 .ldc-menu {
@@ -179,6 +229,7 @@ export const PANEL_CSS = /* css */`
 }
 .ldc-menu[hidden] { display: none; }
 .ldc-chip {
+  display: inline-flex; align-items: center; gap: 5px;
   border: 1px solid var(--line);
   background: var(--bg-soft);
   color: var(--fg-dim);
@@ -189,7 +240,14 @@ export const PANEL_CSS = /* css */`
   font-family: inherit;
   transition: background .15s ease, color .15s ease;
 }
+.ldc-chip svg { width: 12px; height: 12px; display: block; }
 .ldc-chip:hover { background: var(--bg-hover); color: var(--fg); }
+.ldc-chip.is-on {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--ldc-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--ldc-accent) 10%, transparent);
+}
+.ldc-chip.is-on svg { color: var(--ldc-accent); }
 .ldc-chip.danger:hover { color: var(--ldc-accent); border-color: color-mix(in srgb, var(--ldc-accent) 50%, transparent); }
 
 /* ---------- body ---------- */
@@ -197,7 +255,7 @@ export const PANEL_CSS = /* css */`
 .ldc-body::-webkit-scrollbar { width: 8px; }
 .ldc-body::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
 
-.ldc-cat { border-radius: 12px; margin: 4px 4px 0; background: var(--card); border: 1px solid transparent; }
+.ldc-cat { border-radius: 12px; margin: 4px 4px 0; background: var(--card); border: 1px solid transparent; transition: background-color .2s ease, border-color .2s ease; }
 .ldc-cat[open] { border-color: var(--line); }
 .ldc-cat > summary {
   list-style: none;
@@ -217,7 +275,8 @@ export const PANEL_CSS = /* css */`
   box-shadow: 0 0 8px color-mix(in srgb, var(--c, var(--ldc-accent)) 70%, transparent);
 }
 .ldc-cat-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ldc-chev { color: var(--fg-faint); transition: transform .18s ease; font-size: 11px; }
+.ldc-chev { display: flex; color: var(--fg-faint); transition: transform .18s ease; }
+.ldc-chev svg { width: 12px; height: 12px; display: block; }
 .ldc-cat[open] .ldc-chev { transform: rotate(90deg); }
 .ldc-cat-badge {
   font-size: 10.5px; font-weight: 700; color: #fff;
@@ -317,10 +376,11 @@ textarea.ldc-input { min-height: 56px; }
   .ldc-panel {
     right: 6px;
     width: calc(100vw - 12px);
-    bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tt-inset-bottom, 0px)) + 70px);
+    bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--tt-inset-bottom, 0px)) + 64px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .ldc-root * { transition: none !important; }
+  .ldc-fab.ldc-nope { animation: none; }
 }
 `;

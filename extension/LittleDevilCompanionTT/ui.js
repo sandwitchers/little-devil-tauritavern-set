@@ -11,6 +11,10 @@
 //  - All glyphs (😈 ◐ ⋯ ▶) replaced with a consistent stroked SVG icon set.
 //  - Smaller FAB footprint (38px) with a lock badge + "nope" shake feedback.
 //  - Menu gained "Reset button position"; keyboard activation supported.
+//
+// v1.3.0:
+//  - Menu gained "Auto-roll dice into chat" (mirrors the lock chip pattern;
+//    default ON — results are posted as premium cards into the chat bubble).
 import { CATEGORIES } from './data_schema.js';
 import { PANEL_CSS } from './styles.js';
 
@@ -306,9 +310,11 @@ export function buildDashboard(host, api) {
 
     function renderMenu() {
         const locked = !!api.prefs.locked;
+        const autoRoll = api.prefs.autoRoll !== false;
         menuEl.innerHTML = `
           <button class="ldc-chip" data-m="expand">${SVG.expand}${T('runtime.dashboard.expandAll')}</button>
           <button class="ldc-chip" data-m="collapse">${SVG.collapse}${T('runtime.dashboard.collapseAll')}</button>
+          <button class="ldc-chip ${autoRoll ? 'is-on' : ''}" data-m="autoroll">${autoRoll ? SVG.check : SVG.dice}${T('ui.menu.autoRoll')}</button>
           <button class="ldc-chip ${locked ? 'is-on' : ''}" data-m="lock">${locked ? SVG.check : SVG.lock}${T('ui.menu.lockPosition')}</button>
           <button class="ldc-chip" data-m="posreset">${SVG.reset}${T('ui.menu.resetPosition')}</button>
           <button class="ldc-chip" data-m="saveg">${T('tt.menu.saveGlobal')}</button>
@@ -322,6 +328,12 @@ export function buildDashboard(host, api) {
         const m = b.getAttribute('data-m');
         if (m === 'expand') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = true); openCats = new Set(CATEGORIES.map(c => c.key)); }
         else if (m === 'collapse') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = false); openCats.clear(); }
+        else if (m === 'autoroll') {
+            const next = api.prefs.autoRoll === false; // default is ON
+            api.setPrefs({ autoRoll: next });
+            refreshChrome();
+            api.notify?.(T(next ? 'runtime.toast.autoRollOn' : 'runtime.toast.autoRollOff'));
+        }
         else if (m === 'lock') {
             const next = !api.prefs.locked;
             api.setPrefs({ locked: next });

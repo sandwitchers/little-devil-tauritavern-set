@@ -20,7 +20,12 @@ function ttPath(urlPath) {
 }
 
 for (const f of files) {
-    const src = readFileSync(join(EXT, f), 'utf8');
+    const raw = readFileSync(join(EXT, f), 'utf8');
+    // strip full-line // comments BEFORE scanning: comment prose like
+    // "... from './x.js'" used to false-positive as a real import specifier.
+    // (These files keep all meaningful code on non-comment lines; regex
+    // literals here never start a line, so full-line stripping is safe.)
+    const src = raw.replace(/^\s*\/\/.*$/gm, '');
     // static + dynamic import: from '...' / import('...')
     const re = /(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g;
     let m;
@@ -38,7 +43,9 @@ for (const f of files) {
             // tidak di-export oleh sibling module — tidak tertangkap node --check)
             const before = src.slice(0, m.index);
             const braces = before.lastIndexOf('{');
-            const seg = src.slice(braces + 1, src.indexOf('}', braces));
+            const segStart = src.indexOf('}', braces);
+            if (braces < 0 || segStart < 0) continue; // bare import — no named list
+            const seg = src.slice(braces + 1, segStart);
             const names = seg.split(',').map(s => s.trim().split(/\s+as\s+/)[0]).filter(Boolean).filter(n => /^[A-Za-z_$][\w$]*$/.test(n));
             if (names.length) {
                 const target = readFileSync(join(EXT, local), 'utf8');

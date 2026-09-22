@@ -850,15 +850,52 @@
   "maxDepth": null
  },
  {
-  "id": "little-devil-dice-display",
-  "scriptName": "DICE — Show Pending Roll (Display Only)",
-  "findRegex": "/<(?:DICE|dice)>([\\s\\S]*?)<\\/(?:DICE|dice)>/g",
-  "replaceString": "**🎲 Roll requested:** `$1` — tap the 🎲 button on the last message to roll.",
+  "id": "little_devil_regex_51_dice_v13",
+  "scriptName": "Little Devil — Dice Request Chip",
+  "findRegex": "/<DICE>\\s*([^:\\s<>][^:<>]*?)\\s*:\\s*([^:<>]+?)\\s*((?::[^<]*)?)\\s*<\\/DICE>/gi",
+  "replaceString": "<span data-ld-dice-request=\"1\" title=\"Little Devil — tap to roll\" style=\"display:inline-flex;align-items:center;gap:10px;max-width:100%;margin:8px 0;padding:9px 14px;border-radius:14px;background:linear-gradient(135deg,#232837,#181c26);border:1px dashed rgba(255,255,255,.22);box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;-webkit-user-select:none;user-select:none;\"><span style=\"flex:none;width:20px;height:20px;border-radius:6px;border:2px solid #eceff6;position:relative;display:inline-block;box-sizing:border-box;\"><span style=\"position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#eceff6;display:block;\"></span></span><span style=\"font-size:12.5px;font-weight:800;color:#eceff6;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">$2</span><span style=\"font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#9aa5bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;\">$1<i style=\"opacity:.5;font-style:normal;\">$3</i></span><span style=\"flex:none;font-size:9px;font-weight:800;letter-spacing:1.5px;color:#14161d;background:#f0abfc;border-radius:999px;padding:4px 10px;\">ROLL</span></span>",
   "trimStrings": [],
   "placement": [
+   1,
    2
   ],
-  "disabled": true,
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_52_dice_v13",
+  "scriptName": "Little Devil — Dice Result Card",
+  "findRegex": "/<DiceCard\\s+label=\"([^\"]*)\"\\s+sys=\"([^\"]*)\"\\s+chip=\"([^\"]*)\"\\s+formula=\"([^\"]*)\"\\s+rolled=\"([^\"]*)\"\\s+total=\"([^\"]*)\"\\s+tone=\"([^\"]*)\"\\s+verdict=\"([^\"]*)\"\\s*\\/>/g",
+  "replaceString": "<div style=\"max-width:380px;margin:10px 0;padding:12px 16px;border-radius:16px;background:linear-gradient(150deg,#1e222c,#141720);border:1px solid rgba(255,255,255,.08);border-left:3px solid $7;box-shadow:0 6px 22px rgba(0,0,0,.28);\"><div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;\"><span style=\"font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;color:#aab3c7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">$1</span><span style=\"flex:none;font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:$3;background:rgba(255,255,255,.05);border:1px solid $3;border-radius:999px;padding:3px 9px;\">$2</span></div><div style=\"display:flex;align-items:baseline;gap:9px;margin-top:7px;\"><span style=\"font-size:30px;font-weight:800;line-height:1;color:$7;\">$6</span><span style=\"font-size:11.5px;font-weight:600;color:#7f8aa3;font-family:ui-monospace,Menlo,Consolas,monospace;\">$4</span></div><div style=\"margin-top:5px;font-size:11px;color:#8b95ab;\">$5</div><div style=\"margin-top:9px;display:flex;justify-content:flex-end;\"><span style=\"font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:#14161d;background:$7;border-radius:999px;padding:5px 12px;white-space:nowrap;\">$8</span></div></div>",
+  "trimStrings": [],
+  "placement": [
+   1,
+   2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+ },
+ {
+  "id": "little_devil_regex_53_dice_v13",
+  "scriptName": "Little Devil — Dice Free Roll",
+  "findRegex": "/<DiceFree\\s+label=\"([^\"]*)\"\\s+sys=\"([^\"]*)\"\\s+chip=\"([^\"]*)\"\\s+formula=\"([^\"]*)\"\\s+rolled=\"([^\"]*)\"\\s+total=\"([^\"]*)\"\\s+tone=\"([^\"]*)\"\\s*\\/>/g",
+  "replaceString": "<div style=\"max-width:380px;margin:10px 0;padding:12px 16px;border-radius:16px;background:linear-gradient(150deg,#1e222c,#141720);border:1px solid rgba(255,255,255,.08);border-left:3px solid $7;box-shadow:0 6px 22px rgba(0,0,0,.28);\"><div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;\"><span style=\"font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;color:#aab3c7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">$1</span><span style=\"flex:none;font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:$3;background:rgba(255,255,255,.05);border:1px solid $3;border-radius:999px;padding:3px 9px;\">$2</span></div><div style=\"display:flex;align-items:baseline;gap:9px;margin-top:7px;\"><span style=\"font-size:30px;font-weight:800;line-height:1;color:$7;\">$6</span><span style=\"font-size:11.5px;font-weight:600;color:#7f8aa3;font-family:ui-monospace,Menlo,Consolas,monospace;\">$4</span></div><div style=\"margin-top:5px;font-size:11px;color:#8b95ab;\">$5</div></div>",
+  "trimStrings": [],
+  "placement": [
+   1,
+   2
+  ],
+  "disabled": false,
   "markdownOnly": true,
   "promptOnly": false,
   "runOnEdit": true,

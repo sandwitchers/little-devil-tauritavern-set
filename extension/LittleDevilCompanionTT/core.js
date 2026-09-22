@@ -10,6 +10,13 @@ import {
     DERIVED_ROLLS, DERIVED_PICKS, DERIVED_FLAGS, DERIVED_NONEMPTY, DERIVED_EXPRS,
 } from './data_schema.js';
 
+// v1.3.0 install-resilience re-export (user-validated patch, adopted upstream):
+// older/mixed installs (v1.2.0–1.2.1 index.js) pull SETTING_KEYS/DEFAULTS out
+// of core.js. Re-exporting them here makes every file combination load, so the
+// extension never fails to import again — no manual patching needed.
+// Harmless duplication: core.js does not define these names itself.
+export { SETTING_KEYS, DEFAULTS };
+
 export const HELENA_RE = /(?:Helena|헬레나|ヘレナ|helena|へれな)/i;
 export const DICE_TAG_RE = /<(?:DICE|dice)>([\s\S]*?)<\/(?:DICE|dice)>/gi;
 
@@ -362,4 +369,94 @@ export function extractDiceTags(content) {
     const source = String(content == null ? '' : content);
     while ((m = DICE_TAG_RE.exec(source)) !== null) tags.push(m[1].trim());
     return tags;
+}
+
+// ---- immersive dice result cards (v1.3.0) -----------------------------------
+// Roll results are appended to the chat as a USER message containing one
+// machine-readable marker per roll: <DiceCard …/> when a target number was
+// set, <DiceFree …/> for plain rolls. The companion regex scripts ("Little
+// Devil — Dice Result Card / Free Roll") render the markers as premium cards
+// inside the chat bubble, while the raw marker text stays compact and fully
+// readable for the AI in the prompt.
+
+const LD_ATTR_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escAttr(value) {
+    return String(value).replace(/[&<>"']/g, c => LD_ATTR_ESCAPES[c]);
+}
+
+const LD_TONE = {
+    success: '#34d399',   // emerald
+    critical: '#fbbf24',  // gold
+    failure: '#f87171',   // soft red
+    fumble: '#ef4444',    // hard red
+    neutral: '#a78bfa',   // violet — free roll without target
+};
+const LD_SYS_CHIP = { coc_low: '#f0abfc', dnd_high: '#fbbf24' };
+const LD_SYS_NAME = { coc_low: 'CoC', dnd_high: 'D&D' };
+
+function ldSysPill(result) {
+    let pill = LD_SYS_NAME[result.system] || 'D&D';
+    if (result.rollMode === 'advantage') pill += ' · ADV';
+    else if (result.rollMode === 'disadvantage') pill += ' · DIS';
+    return pill;
+}
+
+function ldDetail(result) {
+    const parts = ['Rolled ' + result.attempts.map(d => d.join('+')).join(' / ')];
+    if (result.attempts.length > 1) parts.push('kept #' + result.selectedAttempt);
+    const totalMod = (result.notationModifier || 0) + (result.extraModifier || 0);
+    if (totalMod) parts.push('mod ' + (totalMod > 0 ? '+' : '') + totalMod);
+    return parts.join(' · ');
+}
+
+// verdict badge text + accent tone; verdict '' → free-roll card (no badge)
+function ldVerdict(result) {
+    const hasTarget = result.target !== null && result.target !== undefined;
+    if (!hasTarget) {
+        if (result.critical) return { verdict: 'CRITICAL!', tone: LD_TONE.critical };
+        if (result.fumble) return { verdict: 'FUMBLE', tone: LD_TONE.fumble };
+        return { verdict: '', tone: LD_TONE.neutral };
+    }
+    const coc = result.system === 'coc_low';
+    const cmp = coc ? '≤ ' + result.target : 'DC ' + result.target;
+    let verdict;
+    let tone;
+    if (coc) {
+        if (result.degree === 'critical') { verdict = 'CRITICAL SUCCESS'; tone = LD_TONE.critical; }
+        else if (result.degree === 'fumble') { verdict = 'FUMBLE'; tone = LD_TONE.fumble; }
+        else if (result.degree === 'extreme') { verdict = 'EXTREME SUCCESS'; tone = LD_TONE.success; }
+        else if (result.degree === 'hard') { verdict = 'HARD SUCCESS'; tone = LD_TONE.success; }
+        else if (result.degree === 'regular') { verdict = 'SUCCESS'; tone = LD_TONE.success; }
+        else { verdict = 'FAILURE'; tone = result.fumble ? LD_TONE.fumble : LD_TONE.failure; }
+    } else if (result.critical) { verdict = 'CRITICAL SUCCESS'; tone = LD_TONE.critical; }
+    else if (result.fumble) { verdict = 'FUMBLE'; tone = LD_TONE.fumble; }
+    else if (result.success) { verdict = 'SUCCESS'; tone = LD_TONE.success; }
+    else { verdict = 'FAILURE'; tone = LD_TONE.failure; }
+    return { verdict: verdict + ' · ' + cmp, tone };
+}
+
+export function buildDiceMarker(result) {
+    const r = result || {};
+    const { verdict, tone } = ldVerdict(r);
+    const label = escAttr(r.label || 'Check');
+    const sys = escAttr(ldSysPill(r));
+    const chip = LD_SYS_CHIP[r.system] || LD_SYS_CHIP.dnd_high;
+    const formula = escAttr(r.notation || '');
+    const rolled = escAttr(ldDetail(r));
+    const total = escAttr(String(r.total ?? ''));
+    if (!verdict) {
+        return `<DiceFree label="${label}" sys="${sys}" chip="${chip}" formula="${formula}" rolled="${rolled}" total="${total}" tone="${tone}"/>`;
+    }
+    return `<DiceCard label="${label}" sys="${sys}" chip="${chip}" formula="${formula}" rolled="${rolled}" total="${total}" tone="${tone}" verdict="${escAttr(verdict)}"/>`;
+}
+
+// entries: [{ ok: true, card: resolveCheckResult } | { ok: false, text }]
+// → one chat message body (one marker per line, plain text for parse errors)
+export function buildDiceResultMessage(entries) {
+    const lines = [];
+    for (const e of (entries || [])) {
+        if (e && e.ok) lines.push(buildDiceMarker(e.card));
+        else lines.push('⚠️ ' + String((e && e.text) || 'invalid roll'));
+    }
+    return lines.join('\n');
 }

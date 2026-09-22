@@ -108,7 +108,7 @@ await test('chat baru kosong → semua variabel di-seed ulang (124)', async () =
 });
 
 console.log('\n── FLOW 3: dadu end-to-end ──');
-await test('tombol dadu → hasil dikirim sebagai pesan user + LD_last_roll tercatat', async () => {
+await test('tombol dadu → marker DiceCard dikirim sebagai pesan user + LD_last_roll content-key', async () => {
     await page.evaluate('window.__CTX.chat = [{ mes: "aku menyerang! <DICE>1d20:Attack:DC:10</DICE>" }]; window.__CTX.chatId = "chat-4"');
     await page.evaluate('window.__EVENTS.emit("chat_id_changed", "chat-4")');
     await page.waitForFunction(`window.__CHAT_METADATA.variables?.LD_msg === 1`, null, { timeout: 5000 });
@@ -116,9 +116,11 @@ await test('tombol dadu → hasil dikirim sebagai pesan user + LD_last_roll terc
     await host.locator('[data-act="dice"]').click();
     await page.waitForFunction(`window.__SENT.length > ${before}`, null, { timeout: 5000 });
     const sent = await page.evaluate('window.__SENT[window.__SENT.length - 1]');
-    assert.match(sent, /Attack: 1d20 = \[\d+\]/);
+    assert.match(sent, /^<DiceCard label="Attack"/, 'marker kartu: ' + sent);
+    assert.match(sent, /formula="1d20"/);
+    assert.match(sent, /verdict="(SUCCESS|FAILURE|CRITICAL SUCCESS|FUMBLE) · DC 10"/);
     const v = await page.evaluate('window.__CHAT_METADATA.variables');
-    assert.ok(String(v.LD_last_roll).includes(':1'), 'LD_last_roll = ' + v.LD_last_roll);
+    assert.match(String(v.LD_last_roll), /^0:1d20:Attack:DC:10$/, 'content-key = ' + v.LD_last_roll);
 });
 
 await test('anti-dobel: tombol dadu lagi pada pesan yang sama → ditolak + toast', async () => {
@@ -129,6 +131,68 @@ await test('anti-dobel: tombol dadu lagi pada pesan yang sama → ditolak + toas
     assert.equal(after, before, 'tidak boleh kirim ulang');
     const toasts = await page.evaluate('window.__TOASTS.join(" | ")');
     assert.match(toasts, /sudah|already/i, 'toast anti-dobel: ' + toasts);
+});
+
+console.log('\n── FLOW 3B: v1.3.0 auto-roll + tap-to-roll chip ──');
+await test('MESSAGE_RECEIVED dengan tag DICE → auto-roll kirim kartu hasil (tanpa tombol)', async () => {
+    await page.evaluate('window.__CTX.chat.push({ mes: "Rolanya dulu! <DICE>1d100:Perception:50:LOW</DICE>" })');
+    const before = await page.evaluate('window.__SENT.length');
+    await page.evaluate('window.__EVENTS.emit("message_received", 1)');
+    await page.waitForFunction(`window.__SENT.length > ${before}`, null, { timeout: 5000 });
+    const sent = await page.evaluate('window.__SENT[window.__SENT.length - 1]');
+    assert.match(sent, /^<DiceCard label="Perception"/, 'auto-roll marker: ' + sent);
+    assert.match(sent, /sys="CoC"/);
+    assert.match(sent, /verdict="(EXTREME SUCCESS|HARD SUCCESS|SUCCESS|FAILURE|CRITICAL SUCCESS|FUMBLE) · ≤ 50"/);
+});
+
+await test('MESSAGE_RECEIVED ulang (indeks sama, isi sama) → tidak dikirim ulang', async () => {
+    const before = await page.evaluate('window.__SENT.length');
+    await page.evaluate('window.__EVENTS.emit("message_received", 1)');
+    await page.waitForTimeout(400);
+    const after = await page.evaluate('window.__SENT.length');
+    assert.equal(after, before, 'anti-dobel auto-roll');
+});
+
+await test('swipe: indeks sama, tag beda → auto-roll ulang (content key)', async () => {
+    await page.evaluate('window.__CTX.chat[1].mes = "Varian lain: <DICE>1d100:Spot:50:LOW</DICE>"');
+    const before = await page.evaluate('window.__SENT.length');
+    await page.evaluate('window.__EVENTS.emit("message_received", 1)');
+    await page.waitForFunction(`window.__SENT.length > ${before}`, null, { timeout: 5000 });
+    const sent = await page.evaluate('window.__SENT[window.__SENT.length - 1]');
+    assert.match(sent, /^<DiceCard label="Spot"/, 'swipe re-roll: ' + sent);
+});
+
+await test('toggle auto-roll OFF → MESSAGE_RECEIVED dengan tag baru tidak melempar', async () => {
+    await page.evaluate('window.__EXT_SETTINGS.littleDevilCompanion.ui.autoRoll = false');
+    await page.evaluate('window.__CTX.chat.push({ mes: "Cek terakhir: <DICE>1d20:Save:DC12</DICE>" })');
+    const before = await page.evaluate('window.__SENT.length');
+    await page.evaluate('window.__EVENTS.emit("message_received", 2)');
+    await page.waitForTimeout(500);
+    const after = await page.evaluate('window.__SENT.length');
+    assert.equal(after, before, 'auto-roll off → tidak kirim');
+    await page.evaluate('window.__EXT_SETTINGS.littleDevilCompanion.ui.autoRoll = true');
+});
+
+await test('pesan tanpa tag DICE → tidak ada pengiriman', async () => {
+    await page.evaluate('window.__CTX.chat.push({ mes: "narrasi biasa tanpa dadu." })');
+    const before = await page.evaluate('window.__SENT.length');
+    await page.evaluate('window.__EVENTS.emit("message_received", 3)');
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate('window.__SENT.length'), before);
+});
+
+await test('tap-to-roll: klik chip [data-ld-dice-request] di .mes → roll pesan itu', async () => {
+    await page.evaluate(`(() => {
+        const mes = document.createElement('div');
+        mes.className = 'mes'; mes.setAttribute('mesid', '2');
+        mes.innerHTML = '<span data-ld-dice-request="1">chip</span>';
+        document.body.appendChild(mes);
+    })()`);
+    const before = await page.evaluate('window.__SENT.length');
+    await page.locator('.mes[mesid="2"] [data-ld-dice-request]').click();
+    await page.waitForFunction(`window.__SENT.length > ${before}`, null, { timeout: 5000 });
+    const sent = await page.evaluate('window.__SENT[window.__SENT.length - 1]');
+    assert.match(sent, /^<DiceCard label="Save"/, 'chip roll: ' + sent);
 });
 
 console.log('\n── FLOW 4: profil global via extension_settings ──');

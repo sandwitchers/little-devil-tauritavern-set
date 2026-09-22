@@ -1,4 +1,4 @@
-# QA Report — Little Devil × TauriTavern Set (v1.2.3)
+# QA Report — Little Devil × TauriTavern Set (v1.3.0)
 
 Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 6 (simulator STPT), source TauriTavern 2.3.0 sebagai ground truth.
 
@@ -6,15 +6,16 @@ Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 
 
 | # | Suite | Cakupan | Hasil |
 |---|---|---|---|
-| 1 | `verify_imports` | Semua relative import resolve ke file TT asli + **named exports** tervalidasi | ✅ 0 gagal |
-| 2 | `qa_static` | JSON preset, prompt order, compile EJS per-prompt, coverage 112 kunci `getvar`, audit 1.565 perbandingan literal, drift opsi select vs dashboard asli, i18n, validasi 51 regex | ✅ 0 critical |
+| 1 | `verify_imports` *(hardened v1.3.0)* | Semua relative import resolve ke file TT asli + **named exports** tervalidasi | ✅ 0 gagal |
+| 2 | `qa_static` | JSON preset, prompt order, compile EJS per-prompt, coverage 112 kunci `getvar`, audit 1.565 perbandingan literal, drift opsi select vs dashboard asli, i18n, validasi 53 regex | ✅ 0 critical |
 | 3 | `test_core` | Unit test logic inti | ✅ 25/25 |
 | 4 | `qa_core_diff` | **Differential testing**: entry.js Tavo asli (di-stub) dijalankan berjajaran dengan port pada state acak | ✅ 40 pass, 0 critical |
-| 5 | `qa_regex_sample` | Substitusi nyata 12 pola + audit `$N` capture references 51 script | ✅ 0 critical |
+| 5 | `qa_regex_sample` | Substitusi nyata 12 pola + audit `$N` capture references 53 script | ✅ 0 critical |
 | 6 | `qa_render` | **Simulasi STPT**: 12.888 render EJS nyata × 7 skenario state + uji efektivitas kontrol | ✅ 0 critical, 31/31 select efektif |
-| 7 | `qa_ui_e2e` | **Integrasi penuh**: `index.js` asli + mock ST di browser — event flow, dadu, profil global, migrasi tipe | ✅ 12/12 |
+| 7 | `qa_ui_e2e` | **Integrasi penuh**: `index.js` asli + mock ST di browser — event flow, dadu, profil global, migrasi tipe | ✅ 18/18 *(6 flow baru v1.3.0)* |
 | 8 | `test_ui` | Dashboard unit E2E (desktop + mobile 540×1237@1.33) | ✅ 17/17 |
 | 9 | `test_ui_dashboard` *(v1.2.3)* | **Pointer state machine FAB**: lock/tap/drag matrix, lock badge, toast, reset posisi, keyboard activation, verifikasi tema via fresh-raster clip | ✅ 25/25 |
+| 10 | `test_dice_card` *(v1.3.0)* | **Dadu imersif**: builder marker `<DiceCard/>/<DiceFree/>` (semua branch verdict, escape HTML, ADV/DIS, free roll), round-trip 3 regex script dadu, 10 contoh format tag dari preset, anti-loop self-trigger, kunci anti-dobel berbasis konten | ✅ 25/25 |
 
 **Status akhir: LOLOS SEMUA SUITE — 0 critical, 0 warn terbuka.**
 
@@ -117,7 +118,8 @@ terfilter otomatis).
 npm install playwright ejs
 node qa/scripts/verify_imports.mjs     # import path + named exports
 node qa/scripts/qa_static.mjs          # audit statis preset + schema + i18n + regex
-node qa/scripts/test_core.mjs          # unit core
+node qa/scripts/test_core.mjs
+node qa/scripts/test_dice_card.mjs   # v1.3.0 — dadu imersif (25 assertions)          # unit core
 node qa/scripts/qa_core_diff.mjs       # differential vs entry.js asli (butuh analysis/tpg_extract/entry.js)
 node qa/scripts/qa_regex_sample.mjs    # smoke substitusi regex
 node qa/scripts/qa_render.mjs          # render EJS 12.888× (butuh ejs)
@@ -127,3 +129,25 @@ node qa/scripts/test_ui.mjs            # dashboard E2E (butuh playwright + scrip
 cd repo-root && python3 -m http.server 8123 &
 node qa/scripts/test_ui_dashboard.mjs  # harness: qa/scripts/ui_dashboard_harness.html
 ```
+
+## Tambahan v1.3.0 — dadu imersif di chat bubble
+
+Target: hasil lemparan pindah dari panel extension ke **chat bubble** (permintaan user), tanpa
+mengubah logika dadu yang sudah bit-per-bit identik dengan plugin Tavo asli.
+
+Desain terverifikasi:
+- `MESSAGE_RECEIVED` ber-tag `<DICE>` → auto-roll → hasil dikirim sebagai pesan user berisi
+  marker `<DiceCard/>` (dengan target) atau `<DiceFree/>` (tanpa target) — AI tetap membaca
+  teks ringkas yang terstruktur; regex companion merender kartu premium di bubble.
+- Kunci anti-dobel diganti dari `indeks:jumlah-tag` menjadi **`indeks:isi-tag`** — swipe ke
+  varian dengan tag berbeda melempar ulang, repeat pesan sama tetap ditolak.
+- Chip permintaan roll di bubble AI membawa `data-ld-dice-request` + delegasi klik dokumen
+  (capture) → membaca `mesid` → melempar tag pesan itu (setia pada tombol roll Tavo).
+- Guard anti-loop: pesan hasil tidak mengandung `<DICE>` sehingga tidak memicu roller lagi
+  (diuji eksplisit).
+- Resiko race generasi dihindari: auto-roll HANYA di `MESSAGE_RECEIVED` (fire setelah generasi
+  selesai, termasuk swipe-completion dan first message — diverifikasi ke source TT 2.3.0),
+  bukan di `MESSAGE_SENT`/`MESSAGE_SWIPED`.
+
+Hasil: suite #10 semua hijau; E2E bertambah 6 flow (auto-roll, anti-dobel auto, swipe
+re-roll, toggle OFF, no-tag no-op, tap-to-roll chip) — 18/18 tanpa pageerror.

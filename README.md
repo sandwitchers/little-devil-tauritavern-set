@@ -6,7 +6,7 @@ Porting lengkap **Little Devil v16 (Hotfix Tavo Port)** + **Companion plugin** (
 Preset JSON ────────→ TT Prompt Manager (apa adanya, 38 prompt)
 ST-Prompt-Template ─→ mengeksekusi 3.435 blok EJS (getvar + if/else)
 Companion Extension ─→ init 105 variabel typed + derived vars + dice + dashboard
-Regex Scripts ──────→ Regex extension (51 script, sekali import)
+Regex Scripts ──────→ Regex extension (53 script, sekali import)
 ```
 
 Variabel preset (`LD_*` + 105 toggle) disimpan di `chat_metadata.variables` — terbaca
@@ -18,10 +18,10 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 | Path | Isi |
 |---|---|
-| `dist/LittleDevilCompanionTT-1.2.2.zip` | **Paket siap install** (import ZIP dari panel Extensions) |
+| `dist/LittleDevilCompanionTT-1.3.0.zip` | **Paket siap install** (import ZIP dari panel Extensions) |
 | `extension/LittleDevilCompanionTT/` | Source code companion extension (unminified, bisa dimodifikasi) |
 | `preset/Little_Devil_Hotfix_Tavo_preset.json` | Preset 38 prompt — import ke Prompt Manager |
-| `regex/Little_Devil_Regex_Scripts_TT_Import.json` | 51 regex script — import ke extension Regex |
+| `regex/Little_Devil_Regex_Scripts_TT_Import.json` | 53 regex script — import ke extension Regex |
 | `qa/QA-REPORT.md` | Laporan QA lengkap (8 suite, differential testing vs plugin asli) |
 | `qa/scripts/` | Script QA yang bisa direproduksi |
 
@@ -35,11 +35,13 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 ### 1. Extension Companion
 1. Buka panel **Extensions** (ikon puzzle) → **Import extension** (from ZIP).
-2. Pilih `dist/LittleDevilCompanionTT-1.2.2.zip`.
+2. Pilih `dist/LittleDevilCompanionTT-1.3.0.zip`.
 3. Aktifkan **Little Devil Companion (TT)**.
 
-> **Upgrade dari v1.2.0 yang gagal load?** Import ZIP baru ini akan menimpa folder lama.
-> Kalau masih error, hapus folder `LittleDevilCompanionTT` lama dulu lalu import ulang dan reload app.
+> **Upgrade dari versi lama / pernah gagal load?** Import ZIP baru akan menimpa file lama.
+> Kalau masih error: **hapus folder `LittleDevilCompanionTT` lama sampai bersih** → import ulang
+> ZIP → reload app. Sejak v1.3.0 kamu tidak perlu lagi mem-patch `core.js` secara manual —
+> patch re-export `SETTING_KEYS/DEFAULTS` sudah diadopsi ke upstream.
 
 ### 2. Preset
 1. Buka **AI Response Configuration** → **Preset Manager**.
@@ -48,7 +50,8 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 ### 3. Regex Scripts
 1. Panel **Extensions** → **Regex** → **Import Script**.
-2. Pilih `regex/Little_Devil_Regex_Scripts_TT_Import.json` (51 script masuk sekaligus) — scope **Global**.
+2. Pilih `regex/Little_Devil_Regex_Scripts_TT_Import.json` (53 script masuk sekaligus) — scope **Global**.
+   Termasuk 3 script dadu baru v1.3.0: *Request Chip*, *Result Card*, *Free Roll*.
 
 ### 4. Cek ST-Prompt-Template
 Pastikan statusnya **enabled** di panel Extensions.
@@ -61,10 +64,21 @@ Pastikan statusnya **enabled** di panel Extensions.
 - **104 toggle + 1 catatan dalam 12 seksi** — perubahan **tersimpan otomatis** (pulse "✓ Tersimpan").
   Angka kecil di tiap seksi = jumlah toggle yang berbeda dari default.
 - **Pencarian** — kotak cari memfilter semua variabel (nama/label).
-- **🎲 Dadu** — memproses tag `<DICE>...</DICE>` di pesan terakhir
-  (CoC roll-low / D&D roll-high, ADV/DIS, target DC), hasil dikirim sebagai pesan user.
-  Anti dobel: lempar ulang pesan yang sama ditolak.
-- **Menu ⋯** header: buka/tutup semua seksi · kunci posisi fab · **simpan/terapkan default global** · reset chat ke default preset.
+- **🎲 Dadu imersif di chat bubble (v1.3.0)** — tidak perlu buka dashboard lagi:
+  - AI meminta check dengan tag `<DICE>notation:label:target[:LOW][:ADV|DIS]</DICE>` → tag otomatis
+    dirender **kartu permintaan roll** di bubble AI (chip premium, bisa **di-tap untuk melempar**).
+  - **Auto-roll aktif secara default**: begitu pesan AI masuk, dadu dilempar otomatis dan hasilnya
+    dikirim ke chat sebagai **kartu dadu premium** (label, formula, angka besar, badge verdict
+    SUCCESS/HARD SUCCESS/CRITICAL/FUMBLE berwarna, pill CoC/D&D + ADV/DIS) — lalu AI melanjutkan
+    narasi berdasarkan hasilnya.
+  - Kartu hasil dirender oleh regex script (*Dice Result Card / Free Roll*), teks mentah yang
+    dilihat AI tetap ringkas dan terstruktur.
+  - Anti dobel berbasis konten: pesan yang sama tidak dilempar ulang; **swipe** ke varian dengan
+    tag berbeda otomatis melempar ulang.
+  - Matikan lewat **Menu ⋯ → Auto-lempar dadu ke chat** (lempar manual via tombol 🎲 di FAB
+    atau tap chip roll di bubble).
+- **Menu ⋯** header: buka/tutup semua seksi · auto-lempar dadu · kunci posisi fab ·
+  **simpan/terapkan default global** · reset chat ke default preset.
 - **Tema & bahasa** — ikon ◐ (auto/gelap/terang) dan 🌐 (Auto/ID/EN).
 
 ## Perilaku otomatis
@@ -72,9 +86,33 @@ Pastikan statusnya **enabled** di panel Extensions.
 - **Chat dibuka**: seed 105 variabel bertipe (angka tetap angka — penting untuk `===` ketat di EJS),
   hitung variabel turunan (`LD_roll_*`, `LD_pick_*`, `LD_date/LD_time`, `LD_msg`, `LD_kw_*`, `LD_note_on`, `LD_x1`),
   lalu **HELENA scan** 300 pesan terakhir (sticky, sekali saja).
-- **Tiap pesan terkirim/terima**: variabel turunan di-refresh otomatis.
+- **Tiap pesan terkirim/terima**: variabel turunan di-refresh otomatis; pesan AI berisi tag
+  `<DICE>` langsung di-roll otomatis (bisa dimatikan) dan hasilnya masuk chat sebagai kartu.
 
 ## Changelog
+
+### v1.3.0
+- **🎲 Dadu pindah ke chat bubble (fitur imersif)** — sesuai kontrak preset ("renders the tag as
+  a button and appends its result as the next user message"):
+  - **Auto-roll**: `MESSAGE_RECEIVED` yang mengandung tag `<DICE>` langsung dilempar, hasil
+    dikirim sebagai pesan user berisi marker `<DiceCard/>` / `<DiceFree/>` — AI membaca marker
+    ringkas itu dan melanjutkan narasi. Toggle di menu: *Auto-lempar dadu ke chat* (default ON).
+  - **3 regex script premium baru**: *Dice Request Chip* (tag `<DICE>` di bubble AI dirender jadi
+    chip "ROLL" yang bisa di-tap — pengganti placeholder lama yang disabled), *Dice Result Card*
+    (kartu hasil dengan badge verdict berwarna + DC), *Dice Free Roll* (kartu untuk roll tanpa
+    target). Total regex kini **53 script**.
+  - **Anti-dobel berbasis konten** (`indeks + isi tag`): pesan sama tak dilempar ulang, tapi
+    swipe ke varian berbeda otomatis melempar ulang — memperbaiki kunci lama yang berbasis jumlah tag.
+  - **Tap-to-roll**: chip roll di bubble bisa diklik (event delegation + `mesid`) — setia pada
+    tombol roll bawaan Tavo; tetap jalan juga tanpa auto-roll.
+- **FIX KRITIS (bug import yang berulang)**: `core.js` kini **re-export** `SETTING_KEYS` &
+  `DEFAULTS` (patch manual yang selama ini kamu lakukan tiap update — diadopsi upstream).
+  Kombinasi file lama/baru apa pun kini tetap bisa di-import; tidak perlu patch lagi.
+- `verify_imports.mjs` di-harden (strip komentar sebelum scan — komentar berisi `from '...'`
+  tidak lagi memicu false positive).
+- QA: **+25 test** `test_dice_card.mjs` (builder/escape/regex round-trip/preset examples),
+  E2E integrasi diperluas **12 → 18 flow** (auto-roll, anti-dobel, swipe re-roll, toggle,
+  chip tap), seluruh suite hijau (core 25, UI 17+25, differential 40, render 8, static 21).
 
 ### v1.2.3
 - **FIX KRITIS (bug terkunci di luar extension)**: mengaktifkan *Kunci posisi tombol* (fixed
@@ -131,9 +169,11 @@ Pastikan statusnya **enabled** di panel Extensions.
 
 | Gejala | Cek |
 |---|---|
-| Extension gagal load saat import | Pastikan pakai ZIP **v1.2.1+**; v1.2.0 punya bug import path. Hapus folder lama, import ulang, reload. |
+| Extension gagal load saat import | Pakai ZIP **v1.3.0**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
 | Tombol melayang tak bisa diklik setelah kunci posisi | Sudah diperbaiki di **v1.2.3** (tap tetap jalan saat terkunci). Darurat versi lama: buka menu ⋯ → matikan *Kunci posisi* lewat keyboard, atau update extension. |
 | Seksi preset kosong / toggle tak berpengaruh | Preset Little Devil aktif? ST-Prompt-Template enabled? Companion enabled? |
 | Toggle berubah tapi balik sendiri | Chat metadata belum tersimpan — kirim 1 pesan lalu cek lagi |
-| `<DICE>` tidak diproses | Tag harus ada dalam 30 pesan terakhir; format `NdM:Label` |
+| Kartu dadu tidak muncul / masih tag mentah | Import ulang `regex/...json` (butuh 3 script baru v1.3.0), scope Global. Tanpa regex, marker mentah tetap terbaca AI. |
+| Auto-roll tidak jalan | Menu ⋯ → *Auto-lempar dadu ke chat* harus aktif; tag harus di pesan terbaru (format `NdM:Label:target[:LOW][:ADV\|DIS]`). |
+| Dadu dilempar dua kali / tidak mau lempar ulang | Anti-dobel berbasis konten — swipe dengan tag berbeda otomatis melempar ulang; pakai tombol 🎲 atau tap chip untuk force. |
 | Status panel/HTML tidak tampil | Regex script belum di-import (langkah 3) |
