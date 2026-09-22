@@ -15,6 +15,16 @@
 // v1.3.0:
 //  - Menu gained "Auto-roll dice into chat" (mirrors the lock chip pattern;
 //    default ON — results are posted as premium cards into the chat bubble).
+//
+// v1.3.1 preset-bridge visibility:
+//  - Menu opens with an INTEGRATION STATUS card: is ST-Prompt-Template
+//    detected/enabled/processing, how many preset variables are seeded, and
+//    live readouts (trpgmode / HELENA / LD_msg). When the bridge is down a
+//    warning badge glows on the FAB and a banner appears above the panel —
+//    the preset needs STPT to see ANY dashboard change.
+//  - New chips: "Sync self-test" (writes/reads back a probe variable) and
+//    "Save now" (immediate saveMetadata flush for save-button nostalgia).
+//  - The saved pulse now echoes the committed value ("✓ trpgmode = 1").
 import { CATEGORIES } from './data_schema.js';
 import { PANEL_CSS } from './styles.js';
 
@@ -38,6 +48,8 @@ const SVG = {
     lock: I('<rect x="5.8" y="10.6" width="12.4" height="9.4" rx="2.6"/><path d="M8.6 10.6V8.2a3.4 3.4 0 0 1 6.8 0v2.4"/>'),
     check: I('<path d="M4.5 12.6l5 5L19.5 6.8"/>', 2.6),
     reset: I('<path d="M3.8 8.2A8.6 8.6 0 1 1 3.4 13"/><path d="M3.4 4.5v4h4"/>'),
+    warn: I('<path d="M12 3.6 21.4 20H2.6z"/><path d="M12 9.4v4.4"/><path d="M12 16.9h.01"/>', 1.9),
+    pulse: I('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M5.3 5.3a9.5 9.5 0 0 1 6.7-2.8M18.7 18.7a9.5 9.5 0 0 1-6.7 2.8"/><path d="M8.1 8.1a5.5 5.5 0 0 1 3.9-1.6M15.9 15.9a5.5 5.5 0 0 1-3.9 1.6"/>', 1.6),
     expand: I('<path d="M4.5 9.2V4.5h4.7M19.5 9.2V4.5h-4.7M4.5 14.8v4.7h4.7M19.5 14.8v4.7h-4.7"/>', 2),
     collapse: I('<path d="M9.2 4.5v4.7H4.5M14.8 4.5v4.7h4.7M9.2 19.5v-4.7H4.5M14.8 19.5v-4.7h4.7"/>', 2),
     theme_auto: I('<circle cx="12" cy="12" r="8.4"/><path d="M12 3.6a8.4 8.4 0 0 1 0 16.8z" fill="currentColor" stroke="none"/>'),
@@ -63,9 +75,11 @@ export function buildDashboard(host, api) {
         <button class="ldc-fab-btn" data-act="dice" title="" aria-label=""></button>
         <button class="ldc-fab-btn ldc-devil" data-act="panel" title="" aria-label="">
           <span class="ldc-fab-lock" hidden>${SVG.lock}</span>
+          <span class="ldc-fab-warn" hidden>${SVG.warn}</span>
         </button>
       </div>
       <section class="ldc-panel" hidden>
+        <div class="ldc-banner" hidden>${SVG.warn}<span class="ldc-banner-text"></span></div>
         <header class="ldc-head">
           <span class="ldc-logo">${SVG.devil}</span>
           <div class="ldc-titles">
@@ -114,7 +128,8 @@ export function buildDashboard(host, api) {
         else if (ctl.type === 'select' && ctl.options && typeof ctl.options[0].value === 'number') {
             v = Number(rawValue);
         }
-        return api.setValue(ctl.name, v);
+        api.setValue(ctl.name, v);
+        return v;
     }
     function valuesEqual(ctl, a, b) {
         if (ctl.type === 'switch') return Number(a ? 1 : 0) === Number(b ? 1 : 0);
@@ -241,8 +256,8 @@ export function buildDashboard(host, api) {
     async function commitKey(key, raw) {
         const ctl = findCtl(key);
         if (!ctl) return;
-        await typedCommit(ctl, raw);
-        savedPulse();
+        const v = await typedCommit(ctl, raw);
+        savedPulse(ctl.name, v);
         updateBadges();
     }
 
@@ -270,11 +285,46 @@ export function buildDashboard(host, api) {
         }
     }
 
-    function savedPulse() {
-        pulse.textContent = '✓ ' + T('tt.dashboard.savedPulse');
+    function savedPulse(key, value) {
+        const v = value === undefined ? '' : String(value);
+        pulse.textContent = key
+            ? '✓ ' + key + (v === '' ? '' : ' = ' + (v.length > 22 ? v.slice(0, 22) + '…' : v))
+            : '✓ ' + T('tt.dashboard.savedPulse');
         pulse.classList.add('on');
         clearTimeout(pulseTimer);
         pulseTimer = setTimeout(() => pulse.classList.remove('on'), 1400);
+    }
+
+    // ---- integration status (v1.3.1) ----------------------------------------
+    function statusState() {
+        try { return api.getIntegrationStatus ? api.getIntegrationStatus() : null; }
+        catch { return null; }
+    }
+    function stptStateText(st) {
+        if (!st) return '';
+        if (!st.stpt.installed) return T('runtime.sync.stptOff');
+        if (!st.stpt.enabled) return T('runtime.sync.stptDisabled');
+        if (!st.stpt.generate) return T('runtime.sync.stptGenOff');
+        return T('runtime.sync.stptOn');
+    }
+    function statusCardHtml() {
+        const st = statusState();
+        if (!st) return '';
+        const ok = !!st.ok;
+        const stLine = `${ok ? SVG.check : SVG.warn}<span class="${ok ? 'ok' : 'bad'}">${esc(stptStateText(st))}</span>`;
+        const seeded = `${esc(String(st.seeded))}/${esc(String(st.total))} ${esc(T('runtime.sync.seeded'))}`;
+        const ro = [];
+        if (st.trpgmode !== undefined && st.trpgmode !== null) ro.push('trpgmode=' + esc(String(st.trpgmode)));
+        if (st.helena !== undefined && st.helena !== null) ro.push('HELENA=' + esc(String(st.helena)));
+        if (st.ldMsg !== undefined && st.ldMsg !== null) ro.push('LD_msg=' + esc(String(st.ldMsg)));
+        const hint = ok ? '' : `<p class="ldc-status-hint">${esc(T('runtime.sync.hint'))}</p>`;
+        return `
+          <div class="ldc-status ${ok ? 'is-ok' : 'is-bad'}">
+            <div class="ldc-status-row ldc-status-title">${SVG.pulse}<span>${esc(T('ui.menu.status'))}</span></div>
+            <div class="ldc-status-row">${stLine}</div>
+            <div class="ldc-status-row muted"><span>${seeded}</span>${ro.length ? `<span class="ldc-status-vars">${ro.join(' · ')}</span>` : ''}</div>
+            ${hint}
+          </div>`;
     }
 
     // ---- header / menu -------------------------------------------------------
@@ -298,6 +348,18 @@ export function buildDashboard(host, api) {
         const lockBadge = fab.querySelector('.ldc-fab-lock');
         if (lockBadge) lockBadge.hidden = !locked;
 
+        // v1.3.1: preset-bridge health → FAB warning badge + panel banner
+        const st = statusState();
+        const bridgeDown = !!st && !st.ok;
+        const warnBadge = fab.querySelector('.ldc-fab-warn');
+        if (warnBadge) warnBadge.hidden = !bridgeDown;
+        const banner = panel.querySelector('.ldc-banner');
+        if (banner) {
+            banner.hidden = !bridgeDown;
+            banner.querySelector('.ldc-banner-text').textContent = T('runtime.sync.banner');
+            banner.title = T('runtime.sync.hint');
+        }
+
         searchInput.placeholder = T('runtime.dashboard.searchPlaceholder');
         panel.querySelector('h2').textContent = T('runtime.dashboard.title');
         renderMenu();
@@ -312,6 +374,9 @@ export function buildDashboard(host, api) {
         const locked = !!api.prefs.locked;
         const autoRoll = api.prefs.autoRoll !== false;
         menuEl.innerHTML = `
+          ${statusCardHtml()}
+          <button class="ldc-chip" data-m="sync">${SVG.pulse}${T('ui.menu.syncTest')}</button>
+          <button class="ldc-chip" data-m="savenow">${SVG.check}${T('ui.menu.saveNow')}</button>
           <button class="ldc-chip" data-m="expand">${SVG.expand}${T('runtime.dashboard.expandAll')}</button>
           <button class="ldc-chip" data-m="collapse">${SVG.collapse}${T('runtime.dashboard.collapseAll')}</button>
           <button class="ldc-chip ${autoRoll ? 'is-on' : ''}" data-m="autoroll">${autoRoll ? SVG.check : SVG.dice}${T('ui.menu.autoRoll')}</button>
@@ -328,6 +393,8 @@ export function buildDashboard(host, api) {
         const m = b.getAttribute('data-m');
         if (m === 'expand') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = true); openCats = new Set(CATEGORIES.map(c => c.key)); }
         else if (m === 'collapse') { bodyEl.querySelectorAll('.ldc-cat').forEach(d => d.open = false); openCats.clear(); }
+        else if (m === 'sync') { await api.actions.syncTest?.(); renderMenu(); }
+        else if (m === 'savenow') { await api.actions.saveNow?.(); savedPulse(); }
         else if (m === 'autoroll') {
             const next = api.prefs.autoRoll === false; // default is ON
             api.setPrefs({ autoRoll: next });
@@ -373,6 +440,7 @@ export function buildDashboard(host, api) {
             renderBody();
         } else if (act === 'menu') {
             menuEl.hidden = !menuEl.hidden;
+            if (!menuEl.hidden) renderMenu(); // fresh status + readouts on every open
         }
     });
 
@@ -486,7 +554,7 @@ export function buildDashboard(host, api) {
     renderBody();
 
     return {
-        refresh() { if (!panel.hidden) { updateBadges(); } },
+        refresh() { if (!panel.hidden) { updateBadges(); refreshChrome(); } },
         rerender() { refreshChrome(); renderBody(); },
         close: closePanel,
     };

@@ -2,7 +2,7 @@
 // Proves the lock-position fix + captures visual screenshots.
 import { chromium } from 'playwright';
 
-const BASE = 'http://127.0.0.1:8123/qa/scripts/ui_dashboard_harness.html';
+const BASE = 'http://127.0.0.1:8123/scripts/ui_test_harness.html';
 const SHOTS = '/home/z/my-project/scripts/ui_shots';
 import { mkdirSync } from 'fs';
 mkdirSync(SHOTS, { recursive: true });
@@ -33,7 +33,7 @@ try {
         emojiInPanel: /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(window.harness.shadow.querySelector('.ldc-head').innerHTML),
     }));
     check('FAB has 2 buttons', counts.fabBtns === 2);
-    check('FAB renders SVG icons (dice+devil+lockbadge)', counts.fabSvgs === 3, String(counts.fabSvgs));
+    check('FAB renders SVG icons (dice+devil+lockbadge+warnbadge)', counts.fabSvgs === 4, String(counts.fabSvgs));
     check('panel starts hidden', counts.panelHidden === true);
     check('lock badge hidden initially', counts.lockHidden === true);
     check('categories rendered', counts.catCount > 5, String(counts.catCount) + ' cats / ' + counts.ctlCount + ' controls');

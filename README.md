@@ -35,7 +35,7 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 ### 1. Extension Companion
 1. Buka panel **Extensions** (ikon puzzle) → **Import extension** (from ZIP).
-2. Pilih `dist/LittleDevilCompanionTT-1.3.0.zip`.
+2. Pilih `dist/LittleDevilCompanionTT-1.3.1.zip`.
 3. Aktifkan **Little Devil Companion (TT)**.
 
 > **Upgrade dari versi lama / pernah gagal load?** Import ZIP baru akan menimpa file lama.
@@ -61,8 +61,14 @@ Pastikan statusnya **enabled** di panel Extensions.
 ## Cara pakai
 
 - **Dashboard melayang** — tombol 😈 kanan-bawah. Bisa digeser (drag), posisi diingat.
-- **104 toggle + 1 catatan dalam 12 seksi** — perubahan **tersimpan otomatis** (pulse "✓ Tersimpan").
-  Angka kecil di tiap seksi = jumlah toggle yang berbeda dari default.
+- **104 toggle + 1 catatan dalam 12 seksi** — perubahan **tersimpan otomatis** (pulse
+  "✓ trpgmode = 1" menampilkan variabel & nilai yang baru di-commit). Angka kecil di tiap
+  seksi = jumlah toggle yang berbeda dari default. Mau tetap pakai tombol simpan?
+  **Menu ⋯ → Simpan sekarang** melakukan flush langsung (`saveMetadata`).
+- **Status integrasi (v1.3.1)** — **Menu ⋯** membuka kartu status: apakah
+  **ST-Prompt-Template terdeteksi & aktif**, berapa variabel preset yang sudah ter-seed
+  (`105/105`), dan nilai live `trpgmode / HELENA / LD_msg`. Kalau bridge down, badge
+  peringatan amber muncul di tombol 😈 + banner di panel.
 - **Pencarian** — kotak cari memfilter semua variabel (nama/label).
 - **🎲 Dadu imersif di chat bubble (v1.3.0)** — tidak perlu buka dashboard lagi:
   - AI meminta check dengan tag `<DICE>notation:label:target[:LOW][:ADV|DIS]</DICE>` → tag otomatis
@@ -77,7 +83,8 @@ Pastikan statusnya **enabled** di panel Extensions.
     tag berbeda otomatis melempar ulang.
   - Matikan lewat **Menu ⋯ → Auto-lempar dadu ke chat** (lempar manual via tombol 🎲 di FAB
     atau tap chip roll di bubble).
-- **Menu ⋯** header: buka/tutup semua seksi · auto-lempar dadu · kunci posisi fab ·
+- **Menu ⋯** header: **status integrasi + uji sinkronisasi + simpan sekarang (v1.3.1)** ·
+  buka/tutup semua seksi · auto-lempar dadu · kunci posisi fab ·
   **simpan/terapkan default global** · reset chat ke default preset.
 - **Tema & bahasa** — ikon ◐ (auto/gelap/terang) dan 🌐 (Auto/ID/EN).
 
@@ -90,6 +97,30 @@ Pastikan statusnya **enabled** di panel Extensions.
   `<DICE>` langsung di-roll otomatis (bisa dimatikan) dan hasilnya masuk chat sebagai kartu.
 
 ## Changelog
+
+### v1.3.1 — "kok TRPG mode-nya mati?"
+- **Diagnosis**: laporan user — toggle TRPG mode di-dashboard tidak mengubah perilaku model,
+  berlaku juga untuk variabel lain. Audit rantai penuh (dashboard → `chat_metadata.variables`
+  → STPT `getvar()`) membuktikan: **jembatan variabel benar**, tapi extension buta terhadap
+  kondisi eksternal — kalau **ST-Prompt-Template tidak ter-install / dimatikan / pemrosesan
+  generate-nya off**, model menerima `<% %>` mentah dan SEMUA toggle tampak mati.
+- **Status integrasi (kartu di Menu ⋯)**: deteksi STPT (tidak ada / disabled / generate off /
+  aktif), jumlah variabel ter-seed `105/105`, readout live `trpgmode · HELENA · LD_msg`.
+- **Badge peringatan amber di FAB + banner** saat bridge preset down — tidak ada lagi
+  "toggle yang diam-diam tidak berefek".
+- **Uji sinkronisasi** (Menu ⋯): tulis probe → baca balik → hapus; membuktikan jalur tulis
+  metadata chat bekerja. Toast menampilkan `n/105 variabel aktif`.
+- **Simpan sekarang** (Menu ⋯): flush langsung `saveMetadata()` — auto-save tetap jalan;
+  pulse commit kini menampilkan **key = value** ("✓ trpgmode = 1").
+- **Scrub snapshot basi STPT (asuransi)**: STPT menyimpan salinan variabel per-pesan
+  (`chat[i].variables`) dan pada beberapa versi meng-merge-nya DI ATAS variabel chat. Commit
+  setting kini menghapus kunci milik preset dari snapshot-snapshot itu (kunci milik preset
+  lain dibiarkan utuh) sehingga nilai baru tidak bisa tertimpa versi lama.
+- **Boot safety net**: kalau chat sudah terbuka saat extension dimuat (ekstensi deferred),
+  seed + dashboard tetap dijalankan tanpa menunggu APP_READY.
+- i18n: +14 kunci (id/en). QA: E2E integrasi diperluas **18 → 24 flow** (status card,
+  badge/banner bridge down, sync test, save-now, pulse commit, scrub snapshot),
+  test_core +4 (scrub). Semua suite hijau (lihat `qa/QA-REPORT.md`).
 
 ### v1.3.0
 - **🎲 Dadu pindah ke chat bubble (fitur imersif)** — sesuai kontrak preset ("renders the tag as
@@ -169,7 +200,9 @@ Pastikan statusnya **enabled** di panel Extensions.
 
 | Gejala | Cek |
 |---|---|
-| Extension gagal load saat import | Pakai ZIP **v1.3.0**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
+| **Mode TRPG tidak aktif padahal toggle sudah ON** | 1) Menu ⋯ → **Status integrasi**: ST-Prompt-Template harus **aktif** (kalau tidak terdeteksi → install: Extensions → Install extension → `https://github.com/zonde306/ST-Prompt-Template`, lalu enable). 2) Variabel harus `105/105` ter-seed. 3) **Uji sinkronisasi** harus OK. 4) Kirim pesan baru / regenerate (prompt di-render ulang tiap generate). |
+| Toggle berubah tapi preset tidak merasa | Lihat badge amber di FAB — kalau nyala, bridge STPT down (lihat baris di atas). Kalau tidak: Menu ⋯ → **Simpan sekarang**, lalu regenerate. |
+| Extension gagal load saat import | Pakai ZIP **v1.3.1**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
 | Tombol melayang tak bisa diklik setelah kunci posisi | Sudah diperbaiki di **v1.2.3** (tap tetap jalan saat terkunci). Darurat versi lama: buka menu ⋯ → matikan *Kunci posisi* lewat keyboard, atau update extension. |
 | Seksi preset kosong / toggle tak berpengaruh | Preset Little Devil aktif? ST-Prompt-Template enabled? Companion enabled? |
 | Toggle berubah tapi balik sendiri | Chat metadata belum tersimpan — kirim 1 pesan lalu cek lagi |

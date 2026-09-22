@@ -24,6 +24,17 @@
 //    "rendered roll button".
 //  - Anti-double-roll key is content-based (index + tag text), so swipes of
 //    the same message re-roll correctly while repeats stay blocked.
+//
+// v1.3.1 preset bridge diagnostics:
+//  - The preset reads EVERYTHING through ST-Prompt-Template (STPT) getvar();
+//    if that extension is missing/disabled the model sees raw <% %> and every
+//    dashboard toggle looks dead. The dashboard now shows an integration
+//    status card (STPT detected? enabled? generate processing on?), a sync
+//    self-test, and a FAB warning badge when the bridge is down.
+//  - "Save now" chip forces an immediate saveMetadata() (auto-save stays on).
+//  - Settings commits scrub our keys from STPT per-message variable snapshots
+//    (chat[i].variables) so no stale clone can shadow fresh values on any
+//    STPT version.
 // ============================================================================
 
 // NOTE on relative depth: third-party extensions live at
@@ -32,18 +43,18 @@
 // 2.3.0 source (src/script.js served at /script.js, src/scripts/extensions.js
 // served at /scripts/extensions.js) and against Extension-TopInfoBar, which
 // uses the same depth and loads fine.
-import { eventSource, event_types, chat_metadata, sendMessageAsUser, saveSettingsDebounced } from '../../../../script.js';
+import { eventSource, event_types, chat_metadata, sendMessageAsUser, saveSettingsDebounced, saveMetadata } from '../../../../script.js';
 import { extension_settings, getContext, saveMetadataDebounced } from '../../../extensions.js';
 
 // SETTING_KEYS/DEFAULTS live in data_schema.js (core.js does not re-export them)
-import { SETTING_KEYS, DEFAULTS } from './data_schema.js';
+import { SETTING_KEYS, DEFAULTS, SYSTEM_DEFAULTS } from './data_schema.js';
 
 import {
     GLOBAL_DEFAULTS_KEY, MODULE_NAME,
     coerceTyped, isNumStr, buildInitWrites, computeDerivedWrites,
     scanHelenaMessages, helenaInText,
     extractDiceTags, parseDiceRequest, resolveCheck,
-    buildDiceResultMessage,
+    buildDiceResultMessage, scrubMessageVariables,
 } from './core.js';
 import { buildDashboard } from './ui.js';
 import { L10N } from './data_i18n.js';
@@ -73,6 +84,12 @@ function varsObj() {
 function getVar(key) { return varsObj()[key]; }
 async function setVar(key, value) {
     varsObj()[key] = coerceTyped(key, value);
+    // v1.3.1: a user-facing settings change must never be shadowed by stale
+    // STPT per-message snapshots — strip our key from every snapshot (cheap,
+    // and a no-op on STPT builds that never clone chat variables).
+    if (SETTING_KEYS.indexOf(key) >= 0) {
+        try { scrubMessageVariables(getContext()?.chat, SETTING_KEYS); } catch { /* non-fatal */ }
+    }
     saveMetadataDebounced();
     return varsObj()[key];
 }
@@ -250,8 +267,87 @@ async function resetChatToDefaults() {
     const writes = {};
     for (const k of SETTING_KEYS) writes[k] = coerceTyped(k, DEFAULTS[k]);
     await setVarsBulk(writes);
+    try { scrubMessageVariables(getContext()?.chat, SETTING_KEYS); } catch { /* non-fatal */ }
     await recomputeDerived();
     toast(t('runtime.toast.defaultApplied'));
+}
+
+// ---- preset bridge diagnostics (v1.3.1) -------------------------------------
+// The Little Devil preset is ~3.4k EJS blocks evaluated by ST-Prompt-Template
+// (STPT). Without STPT (or with its generate processing off) the model receives
+// raw <% %> text and EVERY dashboard toggle looks dead — TRPG mode included.
+// These helpers expose the bridge state to the dashboard instead of guessing.
+function detectStpt() {
+    const s = extension_settings && extension_settings.EjsTemplate;
+    if (!s || typeof s !== 'object') {
+        return { installed: false, enabled: false, generate: false };
+    }
+    const enabled = s.enabled !== false;                 // '#pt_enabled'
+    const generate = enabled && s.generate_enabled !== false; // '#pt_generate_enabled'
+    return { installed: true, enabled, generate };
+}
+
+function countSeededVars() {
+    let n = 0;
+    for (const k of SETTING_KEYS) {
+        const v = getVar(k);
+        if (v !== undefined && v !== null) n++;
+    }
+    return n;
+}
+
+function integrationStatus() {
+    const stpt = detectStpt();
+    return {
+        stpt,
+        ok: stpt.generate,
+        seeded: countSeededVars(),
+        total: SETTING_KEYS.length,
+        trpgmode: getVar('trpgmode'),
+        helena: getVar('HELENA'),
+        ldMsg: getVar('LD_msg'),
+    };
+}
+
+// Writes a probe variable, reads it back and clears it — proves the
+// chat_metadata.variables bridge (the one STPT getvar() merges) works.
+async function syncSelfTest() {
+    try {
+        const probeKey = 'LD_sync_probe';
+        const stamp = Date.now();
+        await setVar(probeKey, stamp);
+        const back = getVar(probeKey);
+        delete varsObj()[probeKey];
+        const scrubbed = scrubMessageVariables(getContext()?.chat, SETTING_KEYS.concat(Object.keys(SYSTEM_DEFAULTS)));
+        saveMetadataDebounced();
+        if (Number(back) !== stamp) {
+            console.error(`${LOG} sync self-test: probe mismatch`, stamp, back);
+            toast(t('runtime.toast.syncFail'));
+            return false;
+        }
+        const st = integrationStatus();
+        toast(t('runtime.toast.syncOk', { n: String(st.seeded), total: String(st.total) })
+            + (scrubbed ? ` (+${scrubbed})` : ''));
+        dash && dash.refresh();
+        return true;
+    } catch (e) {
+        console.error(`${LOG} sync self-test failed:`, e);
+        toast(t('runtime.toast.syncFail'));
+        return false;
+    }
+}
+
+// Auto-save stays on; this is an explicit, immediate flush for users who want
+// the certainty of a real save button (delegated to script.js saveMetadata).
+async function saveNow() {
+    try {
+        await saveMetadata();
+        toast(t('runtime.toast.saveNow'));
+    } catch (e) {
+        console.warn(`${LOG} saveNow fallback to debounced:`, e);
+        saveMetadataDebounced();
+        toast(t('runtime.toast.saveNow'));
+    }
 }
 
 // ---- i18n -------------------------------------------------------------------
@@ -303,7 +399,10 @@ function injectUI() {
                 resetChat: resetChatToDefaults,
                 saveGlobal: saveGlobalDefaults,
                 applyGlobal: applyGlobalDefaults,
+                syncTest: syncSelfTest,
+                saveNow,
             },
+            getIntegrationStatus: integrationStatus,
         });
 
         // Tavo-dashboard compatibility bridge
@@ -348,3 +447,15 @@ function register() {
 }
 
 register();
+
+// v1.3.1 boot safety net: TT can activate deferred third-party extensions at
+// any point; if a chat is ALREADY open and APP_READY has fired before us (or
+// races us), seed + paint the dashboard anyway. initChat/injectUI are
+// idempotent, so running them here is harmless when APP_READY also lands.
+try {
+    const bootCtx = getContext();
+    if (bootCtx && bootCtx.chatId && Array.isArray(bootCtx.chat)) {
+        injectUI();
+        initChat();
+    }
+} catch { /* APP_READY will cover it */ }

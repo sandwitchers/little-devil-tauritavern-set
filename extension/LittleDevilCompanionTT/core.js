@@ -460,3 +460,36 @@ export function buildDiceResultMessage(entries) {
     }
     return lines.join('\n');
 }
+
+// ---- STPT message-snapshot hygiene (v1.3.1) ----------------------------------
+// ST-Prompt-Template keeps a per-message variable snapshot (chat[i].variables)
+// and — depending on version/config — merges it OVER chat_metadata.variables
+// when getvar() resolves the stack. The Little Devil preset never calls setvar,
+// so any key of ours found inside those snapshots is a stale shadow that would
+// hide freshly-written dashboard values from the preset. After a settings
+// commit we strip OUR keys from every snapshot; foreign keys (other presets /
+// STPT setvar users) are left untouched.
+// Returns the number of shadowed keys removed.
+export function scrubMessageVariables(chat, keys) {
+    if (!Array.isArray(chat) || !Array.isArray(keys) || !keys.length) return 0;
+    let removed = 0;
+    for (const msg of chat) {
+        if (!msg || typeof msg !== 'object') continue;
+        let vars = msg.variables;
+        if (!vars) continue;
+        if (!Array.isArray(vars)) {
+            // STPT normalizes legacy {0:{},1:{}} shapes into arrays — mirror it
+            try { vars = msg.variables = Object.assign([], vars); } catch { continue; }
+        }
+        for (const snap of vars) {
+            if (!snap || typeof snap !== 'object' || Array.isArray(snap)) continue;
+            for (const k of keys) {
+                if (Object.prototype.hasOwnProperty.call(snap, k)) {
+                    try { delete snap[k]; removed++; }
+                    catch { break; } // frozen snapshot — leave it untouched, keep going
+                }
+            }
+        }
+    }
+    return removed;
+}

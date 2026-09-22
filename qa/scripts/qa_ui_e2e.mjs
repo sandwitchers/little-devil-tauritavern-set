@@ -228,6 +228,80 @@ await test('Apply Global → nilai profil masuk ke chat variables', async () => 
     assert.equal(v[savedKey], 1, `chat baru mulai dari profil global: ${savedKey}`);
 });
 
+console.log('\n── FLOW 4.5: diagnostik bridge preset (v1.3.1) ──');
+await test('STPT aktif → status card OK, badge warn FAB hidden, banner hidden', async () => {
+    await page.evaluate('window.__EXT_SETTINGS.EjsTemplate = { enabled: true, generate_enabled: true }');
+    // refreshChrome berjalan saat panel (re)open
+    await host.locator('[data-act="close"]').click();
+    await host.locator('[data-act="panel"]').click();
+    await page.waitForTimeout(200);
+    assert.equal(await host.locator('.ldc-fab-warn').isVisible().catch(() => false), false, 'badge warn hidden');
+    assert.equal(await host.locator('.ldc-banner').isVisible().catch(() => false), false, 'banner hidden');
+    await host.locator('[data-act="menu"]').click(); // buka menu → status card fresh
+    await page.waitForTimeout(150);
+    assert.ok(await host.locator('.ldc-status.is-ok').count() === 1, 'status card is-ok ter-render');
+    const stText = await host.locator('.ldc-status .ok').first().textContent();
+    assert.match(stText, /ST-Prompt-Template/, 'status text: ' + stText);
+    assert.ok(await host.locator('.ldc-status .ldc-status-vars').count() === 1, 'readout variabel tampil');
+});
+
+await test('STPT dimatikan → badge warn FAB muncul + banner + hint', async () => {
+    await page.evaluate('window.__EXT_SETTINGS.EjsTemplate.enabled = false');
+    await host.locator('[data-act="close"]').click();
+    await host.locator('[data-act="panel"]').click();
+    await page.waitForTimeout(200);
+    assert.equal(await host.locator('.ldc-fab-warn').isVisible(), true, 'badge warn tampil');
+    assert.equal(await host.locator('.ldc-banner').isVisible(), true, 'banner tampil');
+    await host.locator('[data-act="menu"]').click();
+    await page.waitForTimeout(150);
+    assert.ok(await host.locator('.ldc-status.is-bad').count() === 1, 'status card is-bad');
+    assert.ok(await host.locator('.ldc-status-hint').count() === 1, 'hint install tampil');
+    await page.evaluate('window.__EXT_SETTINGS.EjsTemplate.enabled = true');
+});
+
+await test('Uji sinkronisasi: probe ditulis, dibaca balik, lalu dihapus', async () => {
+    await page.evaluate('window.__EXT_SETTINGS.EjsTemplate = { enabled: true, generate_enabled: true }');
+    await host.locator('[data-m="sync"]').click();
+    await page.waitForTimeout(400);
+    const probe = await page.evaluate(`"LD_sync_probe" in window.__CHAT_METADATA.variables`);
+    assert.equal(probe, false, 'probe dibersihkan setelah test');
+    assert.equal(await page.evaluate('window.__SAVED_META_NOW ?? 0') >= 0, true);
+});
+
+await test('Simpan sekarang → saveMetadata() langsung terpanggil', async () => {
+    const before = await page.evaluate('window.__SAVED_META_NOW ?? 0');
+    await host.locator('[data-m="savenow"]').click();
+    await page.waitForTimeout(300);
+    const after = await page.evaluate('window.__SAVED_META_NOW ?? 0');
+    assert.equal(after, before + 1, 'saveMetadata counter naik');
+});
+
+await test('pulse commit: ubah trpgmode via UI → "✓ trpgmode = 1"', async () => {
+    await host.locator('[data-m="collapse"]').click().catch(() => {});
+    await host.locator('.ldc-search input').fill('trpgmode');
+    await page.waitForTimeout(200);
+    const sel = host.locator('.ldc-ctl.is-select[data-key="trpgmode"] select');
+    await sel.selectOption('1');
+    await page.waitForFunction('window.__CHAT_METADATA.variables?.trpgmode === 1', null, { timeout: 5000 });
+    const pulse = await host.locator('.ldc-pulse').textContent();
+    assert.match(pulse, /✓\s*trpgmode = 1/, 'pulse: ' + pulse);
+    await host.locator('.ldc-search input').fill('');
+});
+
+await test('scrub snapshot: commit setting menghapus kunci basi dari chat[i].variables', async () => {
+    await page.evaluate(`(() => {
+        window.__CTX.chat.push({ mes: 'snapshot basi', variables: [{ trpgmode: 0, foreign: 'keep' }] });
+    })()`);
+    await host.locator('.ldc-search input').fill('trpgmode');
+    await page.waitForTimeout(200);
+    await host.locator('.ldc-ctl.is-select[data-key="trpgmode"] select').selectOption('2');
+    await page.waitForFunction('window.__CHAT_METADATA.variables?.trpgmode === 2', null, { timeout: 5000 });
+    const snap = await page.evaluate('window.__CTX.chat[window.__CTX.chat.length - 1].variables[0]');
+    assert.ok(!('trpgmode' in snap), 'trpgmode basi dihapus dari snapshot: ' + JSON.stringify(snap));
+    assert.equal(snap.foreign, 'keep', 'kunci asing dipertahankan');
+    await host.locator('.ldc-search input').fill('');
+});
+
 console.log('\n── FLOW 5: kebersihan runtime ──');
 await test('tidak ada pageerror/console.error sepanjang sesi', async () => {
     assert.equal(pageErrors.length, 0, 'pageerror: ' + pageErrors.join(' | '));

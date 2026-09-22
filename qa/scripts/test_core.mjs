@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     coerceTyped, isNumStr, buildInitWrites, computeDerivedWrites, evalCalc,
     scanHelenaMessages, helenaInText, extractDiceTags,
-    parseDiceRequest, resolveCheck, formatDiceResult,
+    parseDiceRequest, resolveCheck, formatDiceResult, scrubMessageVariables,
 } from '../build/LittleDevilCompanionTT/core.js';
 import { SETTING_KEYS, NUMERIC_KEYS, DEFAULTS, SYSTEM_DEFAULTS } from '../build/LittleDevilCompanionTT/data_schema.js';
 
@@ -231,6 +231,46 @@ test('formatDiceResult renders success/failure and crit markers', () => {
     assert.ok(s.includes('✅ Success!'));
     const crit = resolveCheck({ notation: '1d1', label: 'X', system: 'dnd_high' });
     assert.ok(formatDiceResult(crit).includes('Critical!') || crit.selectedRaw !== 1 || true);
+});
+
+console.log('--- scrubMessageVariables (v1.3.1) ---');
+test('strips only our keys from STPT snapshots, keeps foreign keys', () => {
+    const chat = [
+        null,
+        { variables: [{ trpgmode: 0, HELENA: 'TRUE', foreign_state: 'keep-me' }, { trpgmode: 1 }] },
+        { variables: [{ LD_msg: 3 }] },
+        { mes: 'no variables here' },
+        { variables: [] },
+    ];
+    const removed = scrubMessageVariables(chat, SETTING_KEYS.concat(Object.keys(SYSTEM_DEFAULTS)));
+    assert.equal(removed, 4);
+    const s1 = chat[1].variables[0];
+    assert.ok(!('trpgmode' in s1) && !('HELENA' in s1), 'our keys gone');
+    assert.equal(s1.foreign_state, 'keep-me', 'foreign key preserved');
+    assert.ok(!('trpgmode' in chat[1].variables[1]));
+    assert.ok(!('LD_msg' in chat[2].variables[0]));
+});
+test('normalizes legacy object-shaped variables + ignores junk safely', () => {
+    const chat = [
+        { variables: { 0: { trpgmode: 0 }, 1: { HELENA: 'TRUE' } } },   // legacy {0:{},1:{}}
+        { variables: [null, 'junk', 42, { LD_last_roll: 'x' }] },        // junk slots
+        {},                                                              // no variables
+        null,
+    ];
+    const removed = scrubMessageVariables(chat, ['trpgmode', 'HELENA', 'LD_last_roll']);
+    assert.equal(removed, 3);
+    assert.ok(Array.isArray(chat[0].variables), 'legacy shape normalized to array');
+    assert.ok(!('trpgmode' in chat[0].variables[0]));
+    assert.ok(!('LD_last_roll' in chat[1].variables[3]));
+});
+test('no-op on empty/invalid input', () => {
+    assert.equal(scrubMessageVariables(null, ['trpgmode']), 0);
+    assert.equal(scrubMessageVariables([], null), 0);
+    assert.equal(scrubMessageVariables([{ variables: [{ trpgmode: 1 }] }], []), 0);
+});
+test('read-only chat (frozen) does not throw', () => {
+    const chat = Object.freeze([{ variables: Object.freeze([Object.freeze({ trpgmode: 0 })]) }]);
+    assert.doesNotThrow(() => scrubMessageVariables(chat, ['trpgmode']));
 });
 
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);

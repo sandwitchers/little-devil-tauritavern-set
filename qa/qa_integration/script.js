@@ -21,6 +21,8 @@ export const sendMessageAsUser = async (text) => {
     return null;
 };
 export const saveSettingsDebounced = () => { window.__SAVED_SETTINGS++; };
+// v1.3.1: immediate metadata flush (Save now) — observability via counter
+export const saveMetadata = async () => { window.__SAVED_META_NOW++; };
 
 export const eventSource = {
     on(ev, fn) { if (!handlers.has(ev)) handlers.set(ev, []); handlers.get(ev).push(fn); },
@@ -33,5 +35,6 @@ function off(ev, fn) { const l = handlers.get(ev); if (l) handlers.set(ev, l.fil
 window.__EVENTS = { emit: (ev, ...a) => eventSource.emit(ev, ...a), handlers };
 window.__SENT = [];
 window.__SAVED_SETTINGS = 0;
+window.__SAVED_META_NOW = 0;
 window.__CTX = { chatId: 'chat-1', chat: [] };
 window.__CHAT_METADATA = chat_metadata;   // observability utk QA

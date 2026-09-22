@@ -1,4 +1,4 @@
-# QA Report — Little Devil × TauriTavern Set (v1.3.0)
+# QA Report — Little Devil × TauriTavern Set (v1.3.1)
 
 Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 6 (simulator STPT), source TauriTavern 2.3.0 sebagai ground truth.
 
@@ -8,11 +8,11 @@ Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 
 |---|---|---|---|
 | 1 | `verify_imports` *(hardened v1.3.0)* | Semua relative import resolve ke file TT asli + **named exports** tervalidasi | ✅ 0 gagal |
 | 2 | `qa_static` | JSON preset, prompt order, compile EJS per-prompt, coverage 112 kunci `getvar`, audit 1.565 perbandingan literal, drift opsi select vs dashboard asli, i18n, validasi 53 regex | ✅ 0 critical |
-| 3 | `test_core` | Unit test logic inti | ✅ 25/25 |
+| 3 | `test_core` | Unit test logic inti (+4 scrub snapshot v1.3.1) | ✅ 29/29 |
 | 4 | `qa_core_diff` | **Differential testing**: entry.js Tavo asli (di-stub) dijalankan berjajaran dengan port pada state acak | ✅ 40 pass, 0 critical |
 | 5 | `qa_regex_sample` | Substitusi nyata 12 pola + audit `$N` capture references 53 script | ✅ 0 critical |
 | 6 | `qa_render` | **Simulasi STPT**: 12.888 render EJS nyata × 7 skenario state + uji efektivitas kontrol | ✅ 0 critical, 31/31 select efektif |
-| 7 | `qa_ui_e2e` | **Integrasi penuh**: `index.js` asli + mock ST di browser — event flow, dadu, profil global, migrasi tipe | ✅ 18/18 *(6 flow baru v1.3.0)* |
+| 7 | `qa_ui_e2e` | **Integrasi penuh**: `index.js` asli + mock ST di browser — event flow, dadu, profil global, migrasi tipe, diagnostik bridge | ✅ 24/24 *(6 flow v1.3.0 + 6 flow v1.3.1)* |
 | 8 | `test_ui` | Dashboard unit E2E (desktop + mobile 540×1237@1.33) | ✅ 17/17 |
 | 9 | `test_ui_dashboard` *(v1.2.3)* | **Pointer state machine FAB**: lock/tap/drag matrix, lock badge, toast, reset posisi, keyboard activation, verifikasi tema via fresh-raster clip | ✅ 25/25 |
 | 10 | `test_dice_card` *(v1.3.0)* | **Dadu imersif**: builder marker `<DiceCard/>/<DiceFree/>` (semua branch verdict, escape HTML, ADV/DIS, free roll), round-trip 3 regex script dadu, 10 contoh format tag dari preset, anti-loop self-trigger, kunci anti-dobel berbasis konten | ✅ 25/25 |
@@ -151,3 +151,50 @@ Desain terverifikasi:
 
 Hasil: suite #10 semua hijau; E2E bertambah 6 flow (auto-roll, anti-dobel auto, swipe
 re-roll, toggle OFF, no-tag no-op, tap-to-roll chip) — 18/18 tanpa pageerror.
+
+---
+
+## Tambahan v1.3.1 — diagnostik bridge preset (TRPG mode)
+
+**Laporan user**: toggle TRPG mode tidak mengubah perilaku model (juga variabel lain), curiga
+karena tidak ada tombol save.
+
+### Audit rantai variabel (dilakukan ulang terhadap source STPT asli `zonde306/ST-Prompt-Template` 1.17.9)
+- `getvar()` tanpa scope membaca **scope `cache`** — hasil merge `extension_settings.variables.global`
+  → `STATE.initialVariables` → **`chat_metadata.variables`** → snapshot per-pesan
+  (`precacheVariables`); cache di-rebuild tiap `prepareContext()`. Jembatan extension → preset
+  **benar** pada STPT 1.17.9.
+- Snapshot per-pesan (`clonePreviousMessage`) hanya membawa kunci yang pernah di-`setvar` —
+  preset Little Devil memakai **0× `setvar`** (1.872× `getvar`), jadi tidak ada shadow pada
+  versi terbaru. Pada versi lama yang meng-clone variabel chat ke snapshot, shadow mungkin
+  terjadi → diantisipasi dengan **scrub** (di bawah).
+- Skenario yang menghasilkan gejala persis yang dilaporkan user: **STPT tidak ter-install /
+  disabled / `generate_enabled` off** → semua `<% %>` dikirim mentah → semua kondisi gagal →
+  "roleplay biasa" apa pun yang di-toggle.
+
+### Perbaikan / fitur v1.3.1
+1. **`detectStpt()` + status card integrasi** di menu (terdeteksi / enabled / generate off /
+   aktif + seeded count + readout `trpgmode · HELENA · LD_msg`).
+2. **Badge FAB amber + banner** saat bridge down.
+3. **`syncSelfTest()`**: probe write/read-back/delete + scrub + toast `n/105`.
+4. **`saveNow()`**: `saveMetadata()` langsung (import terverifikasi di `script.js` TT 2.3.0,
+   line 11175) + fallback debounced.
+5. **`scrubMessageVariables(chat, keys)`** (core.js, pure): hapus kunci milik preset dari
+   snapshot `chat[i].variables` (normalisasi bentuk legacy, abaikan junk, aman frozen).
+   Dipanggil di `setVar` (kunci setting), `applyGlobal`, `resetChat`, `syncSelfTest`.
+6. **Boot safety net**: seed + inject UI saat module load bila chat sudah terbuka.
+7. i18n +14 kunci ×2 bahasa; pulse commit kini `✓ key = value`.
+
+### Hasil regresi penuh (v1.3.1)
+| Suite | Hasil |
+|---|---|
+| `verify_imports` | ✅ ALL IMPORTS VERIFIED (termasuk `saveMetadata` baru) |
+| `test_core` | ✅ 29/29 (+4 scrub: foreign-key preserved, legacy shape, no-op, frozen) |
+| `test_dice_card` | ✅ 25/25 |
+| `qa_core_diff` | ✅ 40 pass, 0 critical |
+| `qa_regex_sample` | ✅ 0 critical |
+| `qa_render` | ✅ 0 critical |
+| `qa_static` | ✅ 0 critical |
+| `test_ui` | ✅ 17/17 |
+| `test_ui_dashboard` | ✅ ALL (ekspektasi SVG FAB 3→4: + warn badge) |
+| `qa_ui_e2e` | ✅ 24/24 (+6: status ok/down, sync test, save-now, pulse commit, scrub snapshot) |
