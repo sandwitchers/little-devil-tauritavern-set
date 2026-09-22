@@ -3,7 +3,7 @@
 Porting lengkap **Little Devil v16 (Hotfix Tavo Port)** + **Companion plugin** (dari `.tpg` Tavo) ke **TauriTavern**, juga kompatibel dengan SillyTavern standar.
 
 ```
-Preset JSON ────────→ TT Prompt Manager (apa adanya, 38 prompt)
+Preset JSON ────────→ TT Prompt Manager (apa adanya, 38 prompt + 5 marker TT)
 ST-Prompt-Template ─→ mengeksekusi 3.435 blok EJS (getvar + if/else)
 Companion Extension ─→ init 105 variabel typed + derived vars + dice + dashboard
 Regex Scripts ──────→ Regex extension (53 script, sekali import)
@@ -20,7 +20,7 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 |---|---|
 | `dist/LittleDevilCompanionTT-1.3.0.zip` | **Paket siap install** (import ZIP dari panel Extensions) |
 | `extension/LittleDevilCompanionTT/` | Source code companion extension (unminified, bisa dimodifikasi) |
-| `preset/Little_Devil_Hotfix_Tavo_preset.json` | Preset 38 prompt — import ke Prompt Manager |
+| `preset/Little_Devil_Hotfix_Tavo_preset.json` | Preset 38 prompt + 5 marker bawaan TT (hotfix-2) — import ke Prompt Manager |
 | `regex/Little_Devil_Regex_Scripts_TT_Import.json` | 53 regex script — import ke extension Regex |
 | `qa/QA-REPORT.md` | Laporan QA lengkap (8 suite, differential testing vs plugin asli) |
 | `qa/scripts/` | Script QA yang bisa direproduksi |
@@ -104,6 +104,29 @@ Pastikan statusnya **enabled** di panel Extensions.
   `<DICE>` langsung di-roll otomatis (bisa dimatikan) dan hasilnya masuk chat sebagai kartu.
 
 ## Changelog
+
+### Preset hotfix-2 — "sheet {{user}} & {{char}} dobel di context log"
+- **Laporan user**: di context log, sheet {{user}} (persona) dan {{char}} (deskripsi) muncul
+  **dua kali** — versi ber-wrapper (`<Players Character>` / `<NPC setting>`) di tengah konteks
+  (posisi entri preset `## {{user}}` / `## {{char}}`), lalu **versi mentah tanpa wrapper lagi
+  di blok [system] paling akhir**.
+- **Akar masalah** (diverifikasi ke source TT 2.3.0): TT **selalu** menyiapkan prompt mentah
+  `charDescription` (openai.js:2298) dan `personaDescription` (openai.js:2359; default
+  *persona description position* = *In prompt*, power-user.js:323). Karena prompt order preset
+  **tidak memuat marker** `charDescription`/`personaDescription` (juga `charPersonality`,
+  `scenario`, `worldInfoAfter`), merge loop openai.js:2408–2409 **meng-append-nya di akhir
+  koleksi**, dan `isPromptDisabledForActiveCharacter` (PromptManager.js:1073) mengembalikan
+  `false` untuk identifier yang tidak ada di order → prompt mentah itu **ikut terkirim** sebagai
+  blok [system] terakhir = duplikat.
+- **Fix**: preset kini menyertakan 5 marker bawaan TT di `prompts` + `prompt_order`:
+  `worldInfoAfter` (aktif — konvensi ST; kosong = otomatis difilter), dan
+  `charDescription` / `charPersonality` / `scenario` / `personaDescription` **nonaktif**
+  (sheet memang sudah dirender oleh entri preset `ld-user`/`ld-char`). Dengan entri nonaktif di
+  order, `addToChatCompletion` melewati prompt mentah tersebut → tidak ada lagi injeksi di akhir.
+- **Validasi**: simulasi semantik TT (skip/append/filter) lolos; urutan 38 entri ld-* tidak
+  berubah; definisi marker identik dengan default TT (marker: true, system_prompt: true).
+  Re-import preset **hotfix-2** untuk mendapatkan efeknya (toggles/settings tidak berubah).
+- File: `scripts/fix_preset_sheet_duplication.mjs` (idempotent).
 
 ### v1.3.2 — "bubble-nya kosong!"
 - **Laporan user**: hasil roll tampil **kosong** di bubble user (inspect menampilkan marker

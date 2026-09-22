@@ -1,4 +1,4 @@
-# QA Report — Little Devil × TauriTavern Set (v1.3.2)
+# QA Report — Little Devil × TauriTavern Set (v1.3.2 + preset hotfix-2)
 
 Tanggal QA: 22 September 2026 · Environment: Node 24, Playwright/Chromium, ejs 6 (simulator STPT), source TauriTavern 2.3.0 sebagai ground truth.
 
@@ -246,3 +246,33 @@ juga tampil sebagai teks polos, bukan chip.
 
 Catatan environment: `npm install ejs playwright` + `npx playwright install chromium` +
 static server port 8123 diperlukan untuk suite UI (harness `scripts/ui_test_harness.html`).
+
+## Tambahan preset hotfix-2 — duplikasi sheet {{user}}/{{char}} di context log (laporan user)
+
+**Gejala** (context log.txt): sheet persona & deskripsi char muncul dua kali — ber-wrapper di
+tengah (entri preset `ld-user`/`ld-char` di dalam `<Lore>`) dan mentah di blok `[system]`
+terakhir (urutan: deskripsi char → persona, tanpa wrapper).
+
+**Trace ke source TT 2.3.0 (ground truth):**
+
+| Langkah | Bukti |
+|---|---|
+| TT selalu membuat prompt mentah `charDescription` | `openai.js:2298` (array `systemPrompts`) |
+| `personaDescription` dibuat saat persona position = IN_PROMPT (default) | `openai.js:2352–2361` + `power-user.js:124/323` |
+| Marker tak ada di prompt_order → di-append di akhir koleksi | `openai.js:2403–2410` (`else prompts.add(newPrompt)`) |
+| Identifier tak ada di order → dianggap AKTIF | `PromptManager.js:1073–1077` (`return false`) |
+| Urutan blok akhir (char → persona) cocok dengan log | merge order `systemPrompts` array |
+| Prompt kosong difilter (scenario/charPersonality kosong tak terlihat) | `openai.js:5491–5495` (`getChat`) |
+
+**Fix & verifikasi** (`scripts/fix_preset_sheet_duplication.mjs`, idempotent):
+
+- 5 marker bawaan TT ditambahkan ke `prompts` (bentuk identik default TT: `marker: true`,
+  `system_prompt: true`) dan ke `prompt_order` (character_id 100001):
+  `worldInfoAfter` **aktif** tepat setelah `worldInfoBefore`; `charDescription`,
+  `charPersonality`, `scenario`, `personaDescription` **nonaktif**.
+- Simulasi semantik TT pada hasil patch: `charDescription/charPersonality/scenario/
+  personaDescription → skipped`, `worldInfoAfter → sent` ✅ (sesuai ekspektasi anti-duplikat).
+- Urutan & flag 38 entri ld-* tidak berubah (assert head order byte-per-byte) ✅.
+- Prompt order tanpa definisi tidak bermasalah; di sini definisi juga ditambahkan sehingga
+  marker terlihat di Prompt Manager UI dan tahan terhadap prune ✅.
+- JSON final valid; `prompt_order` bebas identifier dobel ✅.
