@@ -18,10 +18,12 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 | Path | Isi |
 |---|---|
-| `dist/LittleDevilCompanionTT-1.2.1.zip` | **Paket siap install** (import ZIP dari panel Extensions) |
+| `dist/LittleDevilCompanionTT-1.2.2.zip` | **Paket siap install** (import ZIP dari panel Extensions) |
 | `extension/LittleDevilCompanionTT/` | Source code companion extension (unminified, bisa dimodifikasi) |
 | `preset/Little_Devil_Hotfix_Tavo_preset.json` | Preset 38 prompt — import ke Prompt Manager |
 | `regex/Little_Devil_Regex_Scripts_TT_Import.json` | 51 regex script — import ke extension Regex |
+| `qa/QA-REPORT.md` | Laporan QA lengkap (8 suite, differential testing vs plugin asli) |
+| `qa/scripts/` | Script QA yang bisa direproduksi |
 
 ## Requirement
 
@@ -33,7 +35,7 @@ sekaligus oleh `getvar()` EJS (ST-Prompt-Template, scope local) **dan** macro na
 
 ### 1. Extension Companion
 1. Buka panel **Extensions** (ikon puzzle) → **Import extension** (from ZIP).
-2. Pilih `dist/LittleDevilCompanionTT-1.2.1.zip`.
+2. Pilih `dist/LittleDevilCompanionTT-1.2.2.zip`.
 3. Aktifkan **Little Devil Companion (TT)**.
 
 > **Upgrade dari v1.2.0 yang gagal load?** Import ZIP baru ini akan menimpa folder lama.
@@ -73,6 +75,18 @@ Pastikan statusnya **enabled** di panel Extensions.
 - **Tiap pesan terkirim/terima**: variabel turunan di-refresh otomatis.
 
 ## Changelog
+
+### v1.2.2
+- **FIX KRITIS**: `index.js` meng-import `SETTING_KEYS`/`DEFAULTS` dari `core.js` yang tidak
+  mengekspornya → dynamic import tetap gagal meski path v1.2.1 benar. Ditemukan oleh harness
+  integrasi baru (modul `index.js` asli dieksekusi dengan mock ST di browser).
+- `verify_imports` diperkuat: kini memvalidasi named exports modul lokal juga.
+- **Perbaikan bug upstream Tavo**: `LD_note_on` asli membaca dirinya sendiri (fitur author-note
+  tak pernah aktif di plugin Tavo asli) — port kini membaca variabel `note` sesuai intent.
+- **QA menyeluruh 8 suite**: differential testing vs `entry.js` asli (init/derived/dadu
+  bit-per-bit), 12.888 render EJS simulasi STPT (31/31 select efektif), integrasi browser
+  12/12, audit 1.565 perbandingan literal + drift opsi 31/31 select, validasi 51 regex.
+  Laporan lengkap: `qa/QA-REPORT.md`.
 
 ### v1.2.1
 - **FIX KRITIS**: `TypeError: Failed to fetch dynamically imported module` saat load extension.

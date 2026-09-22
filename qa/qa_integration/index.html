@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LDC Integration Harness</title>
+</head>
+<body>
+<div id="sheld"><div id="chat"></div></div>
+<script>
+  window.__TOASTS = [];
+  window.toastr = {
+    info: (m) => { window.__TOASTS.push(String(m)); },
+    success: (m) => { window.__TOASTS.push(String(m)); },
+    warning: (m) => { window.__TOASTS.push(String(m)); },
+    error: (m) => { window.__TOASTS.push(String(m)); },
+  };
+</script>
+<script type="module">
+  import '/scripts/extensions/third-party/LittleDevilCompanionTT/index.js';
+  window.__PAGE_READY = true;
+</script>
+</body>
+</html>
