@@ -47,9 +47,11 @@
 //    import pack → upsert, never duplicates). The host's regex engine then
 //    renders markers natively at display time on every install.
 //  - Fix B (safety net): a debounced DOM fallback scans rendered bubbles for
-//    raw markers and repaints them via core.js renderDiceContent() whenever
-//    the regex path could not run (e.g. regex extension disabled). Markers can
-//    no longer collapse to empty bubbles in any configuration.
+//    raw markers whenever the regex path could not run (e.g. regex extension
+//    disabled) — markers can no longer collapse to empty bubbles. v1.3.3:
+//    markers-only bubbles are repainted wholesale, mixed bubbles are patched
+//    surgically (renderDiceMarkersInto) so the AI's <font>/<code>/markdown
+//    formatting never degrades to raw text.
 // ============================================================================
 
 // NOTE on relative depth: third-party extensions live at
@@ -71,6 +73,7 @@ import {
     extractDiceTags, parseDiceRequest, resolveCheck,
     buildDiceResultMessage, scrubMessageVariables,
     DICE_REGEX_SCRIPTS, hasDiceMarkers, renderDiceContent,
+    isMarkersOnlyBody, renderDiceMarkersInto,
 } from './core.js';
 import { buildDashboard } from './ui.js';
 import { L10N } from './data_i18n.js';
@@ -282,9 +285,30 @@ function ensureDiceRegexScripts() {
 // data-ld-dice-request/card/free attributes — if none are present while the
 // raw message still holds markers, the fallback takes over. A fingerprint
 // attribute keeps the rescan (and our own mutation) from looping.
+// v1.3.3: the fallback is formatting-preserving. Roll-result bubbles (dice
+// markers ONLY) are repainted wholesale; mixed bubbles (roll requests inside
+// the AI narrative) are patched surgically — renderDiceMarkersInto() swaps
+// just the marker residue for the rendered chip/card, so <font>, code blocks
+// and markdown rendering survive untouched instead of showing raw.
 let diceChatObserver = null;
 let diceObservedChatEl = null;
 let diceScanTimer = null;
+
+// The regex-rendered chip/card carries data-ld-dice-* signatures. DOMPurify
+// keeps data-* attributes, but should a host config ever strip them, the
+// builders' distinctive inline gradients still identify a painted bubble.
+const DICE_PAINT_TOKENS = [
+    'data-ld-dice-request', 'data-ld-dice-card', 'data-ld-dice-free',
+    'linear-gradient(135deg,#232837', 'linear-gradient(150deg,#1e222c',
+];
+
+function diceBubblePainted(textEl) {
+    try {
+        if (textEl.querySelector('[data-ld-dice-request],[data-ld-dice-card],[data-ld-dice-free]')) return true;
+        const html = textEl.innerHTML || '';
+        return DICE_PAINT_TOKENS.some(tok => html.includes(tok));
+    } catch { return false; }
+}
 
 function scanDiceBubbles() {
     try {
@@ -300,10 +324,18 @@ function scanDiceBubbles() {
             if (!hasDiceMarkers(raw)) continue;
             const textEl = block.querySelector('.mes_text');
             if (!textEl || block.classList.contains('editing')) continue;
-            if (textEl.querySelector('[data-ld-dice-request],[data-ld-dice-card],[data-ld-dice-free]')) continue;
+            if (diceBubblePainted(textEl)) continue;
             const fingerprint = 'L' + raw.length + ':' + idx;
             if (textEl.getAttribute('data-ld-dice-fallback') === fingerprint) continue;
-            textEl.innerHTML = renderDiceContent(raw);
+            if (isMarkersOnlyBody(raw)) {
+                // Roll-result bubbles: nothing but markers → a full repaint
+                // cannot lose any content (v1.3.2 behavior, kept).
+                textEl.innerHTML = renderDiceContent(raw);
+            } else {
+                // Mixed narrative + marker (roll REQUESTS): surgical patch so
+                // the host's own formatted HTML survives untouched.
+                renderDiceMarkersInto(textEl, raw);
+            }
             textEl.setAttribute('data-ld-dice-fallback', fingerprint);
         }
     } catch (e) {

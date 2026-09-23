@@ -105,6 +105,37 @@ Pastikan statusnya **enabled** di panel Extensions.
 
 ## Changelog
 
+### v1.3.3 — "formatting bubble jadi raw kalau ada dice roll"
+- **Laporan user**: di turn yang ada dice roll-nya, render chat bubble **pecah** —
+  `<font color=…>`, code block, inline code, dsb. tampil **mentah** (screenshot
+  `Screenshot_2026-09-22-18-53-08`); hanya terjadi pada bubble yang memuat marker dadu.
+- **Akar masalah**: fallback DOM v1.3.2 (Fix B) menimpa **seluruh** `.mes_text` dengan
+  `renderDiceContent(raw)` — teks pesan mentah di-escape semua (`<` → `&lt;` dst). Untuk bubble
+  hasil roll (isinya murni marker) ini aman, tapi bubble **roll request** berisi narasi kaya
+  format + tag `<DICE>` di ujungnya → seluruh formatting musnah jadi teks mentah. Fallback ini
+  aktif ketika jalur regex tidak mengecat signature (mis. extension Regex dimatikan, atau definisi
+  belum ter-install).
+- **Fix — fallback non-destruktif**:
+  - `isMarkersOnlyBody()` (core.js) membedakan bubble **marker murni** (hasil roll → repaint
+    penuh, perilaku v1.3.2 dipertahankan) dari bubble **campuran** (narasi + marker).
+  - `renderDiceMarkersInto()` (core.js) — mode **bedah presisi**: mem-patch bubble yang SUDAH
+    diformat host di tempat, mengganti hanya teks sisa marker (residu `formula:label` setelah
+    DOMPurify men-strip tag, atau bentuk literal `<DICE>…</DICE>` saat encode_tags/code block)
+    dengan chip/kartu premium. `<font>`, `<pre><code>`, markdown, dan rendering regex/theme
+    lain **tidak tersentuh sama sekali**.
+  - Marker tanpa residu (kartu self-closing yang lenyap utuh) di-append di akhir bubble.
+  - Guard idempoten + fingerprint + deteksi paint via visual-token gradient (tahan bila host
+    men-strip `data-*`).
+- **Kenapa chip bisa tidak terlukis di device user**: jalur regex hanya jalan bila extension
+  **Regex** aktif (`disabledExtensions` tidak memuat `regex` — engine.js:480 TT 2.3.0). Kalau
+  dimatikan, sekarang fallback menampilkan chip TANPA merusak formatting; nyalakan kembali
+  extension Regex untuk jalur render penuh.
+- QA: **+21 test** (`qa/scripts/test_dice_fallback_133.mjs`) — mereplikasi bubble persis dari
+  screenshot user di Chromium asli (core.js dimuat sebagai ES module): `<font>`/`<pre><code>`
+  utuh, residu terganti chip pada posisinya, literal escaped & entity tetap cocok, multi-marker,
+  idempotent, tanpa pageerror. Semua suite lama tetap hijau (verify_imports, core 29, dice_card
+  25, dice_render_132 54, UI 17+25, e2e 24, differential 40, regex/render/static 0 critical).
+
 ### Preset hotfix-2 — "sheet {{user}} & {{char}} dobel di context log"
 - **Laporan user**: di context log, sheet {{user}} (persona) dan {{char}} (deskripsi) muncul
   **dua kali** — versi ber-wrapper (`<Players Character>` / `<NPC setting>`) di tengah konteks
@@ -253,11 +284,11 @@ Pastikan statusnya **enabled** di panel Extensions.
 |---|---|
 | **Mode TRPG tidak aktif padahal toggle sudah ON** | 1) Menu ⋯ → **Status integrasi**: ST-Prompt-Template harus **aktif** (kalau tidak terdeteksi → install: Extensions → Install extension → `https://github.com/zonde306/ST-Prompt-Template`, lalu enable). 2) Variabel harus `105/105` ter-seed. 3) **Uji sinkronisasi** harus OK. 4) Kirim pesan baru / regenerate (prompt di-render ulang tiap generate). |
 | Toggle berubah tapi preset tidak merasa | Lihat badge amber di FAB — kalau nyala, bridge STPT down (lihat baris di atas). Kalau tidak: Menu ⋯ → **Simpan sekarang**, lalu regenerate. |
-| Extension gagal load saat import | Pakai ZIP **v1.3.2**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
+| Extension gagal load saat import | Pakai ZIP **v1.3.3**. Hapus folder `LittleDevilCompanionTT` lama **sampai bersih** → import ulang → reload. Sejak v1.3.0 patch manual `core.js` tidak diperlukan lagi (re-export sudah upstream). |
 | Tombol melayang tak bisa diklik setelah kunci posisi | Sudah diperbaiki di **v1.2.3** (tap tetap jalan saat terkunci). Darurat versi lama: buka menu ⋯ → matikan *Kunci posisi* lewat keyboard, atau update extension. |
 | Seksi preset kosong / toggle tak berpengaruh | Preset Little Devil aktif? ST-Prompt-Template enabled? Companion enabled? |
 | Toggle berubah tapi balik sendiri | Chat metadata belum tersimpan — kirim 1 pesan lalu cek lagi |
-| Kartu dadu tidak muncul / masih tag mentah | Import ulang `regex/...json` (butuh 3 script baru v1.3.0), scope Global. Tanpa regex, marker mentah tetap terbaca AI. |
+| Kartu dadu tidak muncul / masih tag mentah | **Sejak v1.3.2 tidak perlu import manual** — extension otomatis meng-install 3 script dadu. Pastikan extension **Regex** tidak dimatikan (menu Extensions); tanpa Regex pun v1.3.3 menampilkan chip/kartu via fallback yang aman. |
 | Auto-roll tidak jalan | Menu ⋯ → *Auto-lempar dadu ke chat* harus aktif; tag harus di pesan terbaru (format `NdM:Label:target[:LOW][:ADV\|DIS]`). |
 | Dadu dilempar dua kali / tidak mau lempar ulang | Anti-dobel berbasis konten — swipe dengan tag berbeda otomatis melempar ulang; pakai tombol 🎲 atau tap chip untuk force. |
 | Status panel/HTML tidak tampil | Regex script belum di-import (langkah 3) |

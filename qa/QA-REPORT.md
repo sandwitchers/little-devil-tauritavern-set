@@ -276,3 +276,43 @@ terakhir (urutan: deskripsi char → persona, tanpa wrapper).
 - Prompt order tanpa definisi tidak bermasalah; di sini definisi juga ditambahkan sehingga
   marker terlihat di Prompt Manager UI dan tahan terhadap prune ✅.
 - JSON final valid; `prompt_order` bebas identifier dobel ✅.
+
+## v1.3.3 — fallback DOM non-destruktif (formatting bubble aman)
+
+**Laporan user**: bubble yang memuat dice roll merender `<font color=…>`, code block, inline
+code sebagai teks mentah (`Screenshot_2026-09-22-18-53-08`).
+
+**Trace akar masalah (source TT 2.3.0 + extension v1.3.2)**:
+
+| Fakta | Bukti |
+|---|---|
+| Fallback v1.3.2 menimpa seluruh `.mes_text` dari teks mentah | `index.js:306` `textEl.innerHTML = renderDiceContent(raw)` |
+| `renderDiceContent` meng-escape semua segmen non-marker | `core.js` `escapeDisplayText` (`<` → `&lt;`) |
+| Fallback aktif hanya bila regex path tidak melukis signature | guard `querySelector('[data-ld-dice-request]…')` |
+| Regex path gagal bila extension Regex dimatikan | `engine.js:480` `disabledExtensions.includes('regex')` → `return` |
+| `data-*` lolos DOMPurify (default) — signature valid bila regex jalan | config `messageFormatting` tidak mengubah `ALLOW_DATA_ATTR` |
+| Bubble roll-request = narasi kaya format + `<DICE>` di ujung | screenshot user: `<font>` raw, `§…§`, ``` blok |
+
+**Fix (v1.3.3)**:
+
+- `isMarkersOnlyBody()` — bedakan marker murni (repaint penuh, aman) vs campuran.
+- `renderDiceMarkersInto()` — bedah presisi pada DOM terformat: residu `formula:label`
+  (whitespace-flex) atau bentuk literal `<DICE>…</DICE>` (encode_tags/code block) diganti
+  chip/kartu via `Range`; marker tanpa residu di-append; guard idempoten (signature check)
+  mencegah dobel.
+- `scanDiceBubbles()` — cabang per jenis bubble + deteksi paint visual-token gradient
+  (tahan bila `data-*` di-strip host).
+
+**Bukti test** (`qa/scripts/test_dice_fallback_133.mjs`, Chromium asli, core.js ES module):
+
+- Scenario A = bubble persis screenshot user: 1 chip dilukis di paragraf terakhir (posisi
+  residu), `<font>` tetap 2 elemen & tidak ter-escape, `<pre><code>` utuh, teks code tak berubah ✅
+- B literal `&lt;DICE&gt;` terganti; C literal di dalam `<code>` terganti ✅
+- D kartu tanpa residu di-append, narasi utuh; E residu whitespace-flex cocok; F 2 marker →
+  2 chip, residu telanjang hilang; G entity (`&amp;`) cocok setelah decode ✅
+- H idempotent (panggil ulang tidak mendobel); I chip membawa signature klik ✅
+- 21/21 pass; tanpa pageerror ✅
+
+**Regresi penuh**: verify_imports ALL ✓, test_core 29/29, test_dice_card 25/25,
+test_dice_render_132 54/54, test_ui 17/17, test_ui_dashboard ALL, qa_ui_e2e 24/24,
+qa_core_diff 40/0/0, qa_regex_sample 0 critical, qa_render 8/0/0, qa_static 0 critical ✅
